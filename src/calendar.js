@@ -248,7 +248,34 @@ async function loadFromScript(url, from, to) {
 
     const res = await fetch(target, { redirect: 'follow' });
 
-    const data = await res.json();
+    const text = await res.text();
+
+    let data;
+
+    try {
+
+      data = JSON.parse(text);
+
+    } catch {
+
+      // Google answered with an HTML page instead of JSON
+      const title = (text.match(/<title>([^<]*)<\/title>/i) || [])[1] || '';
+
+      if (/accounts\.google\.com|ServiceLogin|Sign in/i.test(res.url + ' ' + title)) {
+        throw new Error('Google asked for login: set "Who has access" to Anyone');
+      }
+
+      if (/function not found|doGet/i.test(text)) {
+        throw new Error('doGet not found: paste Code.gs and deploy a new version');
+      }
+
+      if (res.status === 404 || /not found/i.test(title)) {
+        throw new Error('URL not found: use the Web app URL ending in /exec');
+      }
+
+      throw new Error(`HTML instead of JSON (HTTP ${res.status}${title ? ', ' + title.trim() : ''})`);
+
+    }
 
     if (data.error) throw new Error(data.error);
 
@@ -258,7 +285,7 @@ async function loadFromScript(url, from, to) {
 
     return CALENDARS.map(cal => ({
       id: cal.id, name: cal.name, color: cal.color,
-      error: 'Script: ' + (err.message || 'failed').slice(0, 60),
+      error: 'Script: ' + (err.message || 'failed').slice(0, 90),
       events: []
     }));
 
@@ -278,7 +305,7 @@ export async function loadCalendars(env, from, to) {
 
     const base = { id: cal.id, name: cal.name, color: cal.color };
 
-    if (!url) return { ...base, error: 'Not configured', events: [] };
+    if (!url) return { ...base, error: 'No data yet: run setup() in Apps Script', events: [] };
 
     try {
 
