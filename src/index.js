@@ -56,8 +56,45 @@ export class SheetStore {
     const method =
       request.method;
 
+    // ---------- CALENDAR (pushed by Google Apps Script) ----------
+    // Only reachable through the Worker, which checks the token / name first
+
+    if (path === '/api/calendar-sync' && method === 'POST') {
+
+      const body =
+        await request.json().catch(() => null);
+
+      if (!body || !Array.isArray(body.calendars)) {
+
+        return json({ error: 'Invalid body' }, 400);
+
+      }
+
+      const data = {
+        from: body.from || null,
+        to: body.to || null,
+        calendars: body.calendars,
+        syncedAt: new Date().toISOString()
+      };
+
+      await this.ctx.storage.put('calendar', data);
+
+      return json({ ok: true, syncedAt: data.syncedAt });
+
+    }
+
+
     const name =
       userName(request);
+
+
+    if (path === '/api/calendar' && method === 'GET' && name) {
+
+      return json(
+        (await this.ctx.storage.get('calendar')) || { calendars: null }
+      );
+
+    }
 
 
     if (!name) {
@@ -195,6 +232,15 @@ export class SheetStore {
 }
 
 
+function store(env) {
+
+  return env.SHEET_STORE.get(
+    env.SHEET_STORE.idFromName('main')
+  );
+
+}
+
+
 export default {
 
   async fetch(request, env) {
@@ -203,10 +249,40 @@ export default {
       new URL(request.url);
 
 
-    // Calendar is read straight from Google (no Durable Object)
+    // Google Apps Script pushes the events here (x-sync-token = SYNC_TOKEN)
+    if (url.pathname === '/api/calendar-sync') {
+
+      const token =
+        request.headers.get('x-sync-token') || '';
+
+      if (request.method !== 'POST' || !env.SYNC_TOKEN || token !== env.SYNC_TOKEN) {
+
+        return json({ error: 'Unauthorized' }, 401);
+
+      }
+
+      if (Number(request.headers.get('content-length') || 0) > 1_000_000) {
+
+        return json({ error: 'Too large' }, 413);
+
+      }
+
+      return store(env).fetch(request);
+
+    }
+
+
     if (url.pathname === '/api/calendar' && request.method === 'GET') {
 
       if (!userName(request)) return json({ error: 'Name required' }, 401);
+
+      // 1) events pushed by Apps Script
+      const stored =
+        await (await store(env).fetch(request)).json();
+
+      if (stored.calendars) return json(stored);
+
+      // 2) fallback: read Google directly (secret iCal / public script URL)
 
       const iso = /^\d{4}-\d{2}-\d{2}$/;
       const today = new Date().toISOString().slice(0, 10);
@@ -222,10 +298,7 @@ export default {
 
     if (url.pathname.startsWith('/api/')) {
 
-      const id =
-        env.SHEET_STORE.idFromName('main');
-
-      return env.SHEET_STORE.get(id).fetch(request);
+      return store(env).fetch(request);
 
     }
 
