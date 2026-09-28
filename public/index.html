@@ -326,6 +326,74 @@
   #cal-events li .what small { display: block; color: var(--muted); }
   #cal-events li .tags { color: var(--accent); font-weight: 700; font-size: 13px; }
   #cal-events .empty { border: 0; background: none; color: var(--muted); }
+
+  /* ---------- ROLES ---------- */
+
+  .gate-card .admin-toggle { display: block; margin: -4px 0 14px; font-size: 14px; }
+  .gate-card .error { color: var(--danger); font-size: 14px; margin: -6px 0 12px; min-height: 1em; }
+  #gate-pass-wrap.hidden { display: none; }
+
+  .role-badge {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #e7eefb;
+    color: var(--accent);
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
+  .badge-visible { background: #e3f4ea; color: var(--ok); }
+  .badge-hidden { background: #eee; color: var(--muted); }
+
+  body.staff .admin-only { display: none !important; }
+  body:not(.staff) .staff-only { display: none !important; }
+
+  /* read-only fields keep the ink colour */
+  select:disabled, input:disabled {
+    color: var(--ink);
+    -webkit-text-fill-color: var(--ink);
+    opacity: 1;
+    cursor: default;
+  }
+
+  select:disabled { -webkit-appearance: none; appearance: none; }
+
+  body.staff .times select {
+    background: #fffbe6;
+    border-bottom-color: #d9a400;
+  }
+
+  .row-by { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; text-align: center; }
+
+  #empty-staff {
+    max-width: 820px;
+    margin: 40px auto;
+    padding: 24px 16px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 17px;
+  }
+
+  #empty-staff.hidden, main.hidden { display: none; }
+
+  #cal-events li.choose { outline: 2px dashed #d9a400; }
+  #cal-events li .none { font-size: 12px; color: var(--muted); }
+
+  .row-clear {
+    flex: 0 0 auto;
+    padding: 2px 8px;
+    font-size: 16px;
+    line-height: 1;
+    color: var(--muted);
+  }
+
+  input[data-field=number][readonly] { cursor: default; }
+  tr.invalid td { background: #fdecea; }
+  #cal-events li .picks { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  #cal-events li .picks button { font-size: 13px; padding: 6px 10px; }
 </style>
 </head>
 <body>
@@ -336,6 +404,11 @@
     <h1>Delivery Sheet</h1>
     <p>Please enter your name to continue.</p>
     <input id="gate-name" type="text" autocomplete="name" placeholder="Your name" maxlength="60" required>
+    <button class="link admin-toggle" id="gate-admin-toggle" type="button">I'm the admin</button>
+    <div id="gate-pass-wrap" class="hidden">
+      <input id="gate-pass" type="password" autocomplete="current-password" placeholder="Admin password">
+    </div>
+    <div class="error" id="gate-error"></div>
     <button class="primary wide" type="submit">Enter</button>
   </form>
 </div>
@@ -348,12 +421,12 @@
   </div>
   <span id="status"></span>
   <button type="button" id="btn-refresh">Refresh</button>
-  <button type="button" id="btn-new">New</button>
-  <button type="button" class="primary" id="btn-save">Save</button>
+  <button type="button" class="admin-only" id="btn-new">New</button>
+  <button type="button" class="primary admin-only" id="btn-save">Save</button>
 </div>
 
-<!-- ================= CALENDAR ================= -->
-<div id="calendar">
+<!-- ================= CALENDAR (admin) ================= -->
+<div id="calendar" class="admin-only">
   <div class="cal-card">
     <div class="cal-head">
       <strong>Calendar · <span id="cal-date">select a date</span></strong>
@@ -365,12 +438,20 @@
   </div>
 </div>
 
-<!-- ================= SAVED SHEETS ================= -->
+<!-- ================= SHEETS LIST ================= -->
 <div id="saved">
-  <details>
-    <summary>Saved sheets (<span id="saved-count">0</span>)</summary>
+  <details id="saved-details">
+    <summary>
+      <span class="admin-only">Saved sheets</span>
+      <span class="staff-only">Available sheets</span>
+      (<span id="saved-count">0</span>)
+    </summary>
     <ul id="saved-list"></ul>
   </details>
+</div>
+
+<div id="empty-staff" class="hidden">
+  No sheet is available yet.<br>Ask the admin to make today's sheet visible, then press Refresh.
 </div>
 
 <!-- ================= SHEET ================= -->
@@ -487,6 +568,7 @@
   }
 
   const NAME_KEY = 'delivery-sheet:name';
+  const ADMIN_KEY = 'delivery-sheet:admin-token';
 
   const $ = id => document.getElementById(id);
 
@@ -529,7 +611,10 @@
   }
 
   function safeSet(key, value) {
-    try { localStorage.setItem(key, value); } catch {}
+    try {
+      if (value) localStorage.setItem(key, value);
+      else localStorage.removeItem(key);
+    } catch {}
   }
 
   function newId() {
@@ -548,6 +633,14 @@
     })[c]);
   }
 
+  function timeNow() {
+    return new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function rowField(i, f) {
+    return document.querySelector(`[data-row="${i}"][data-field="${f}"]`);
+  }
+
 
   // =========================================
   // BUILD FORM
@@ -555,25 +648,12 @@
 
   function buildHeader() {
 
-    fillSelect(
-      $('date-month'),
-      MONTHS.map((name, i) => [i + 1, name]),
-      'Month'
-    );
-
-    fillSelect(
-      $('date-year'),
-      YEARS.map(y => [y, String(y)]),
-      'Year'
-    );
+    fillSelect($('date-month'), MONTHS.map((name, i) => [i + 1, name]), 'Month');
+    fillSelect($('date-year'), YEARS.map(y => [y, String(y)]), 'Year');
 
     $('date-year').value = String(YEARS[0]);
 
-    fillSelect(
-      $('weekday'),
-      WEEKDAYS.map(d => [d, d]),
-      'Select day'
-    );
+    fillSelect($('weekday'), WEEKDAYS.map(d => [d, d]), 'Select day');
 
     refreshDays();
 
@@ -634,7 +714,8 @@
               <option value="PP">PP</option>
               <option value="OS">OS</option>
             </select>
-            <input type="text" data-row="${i}" data-field="number" inputmode="numeric" aria-label="PP / OS number">
+            <input type="text" data-row="${i}" data-field="number" readonly placeholder="" aria-label="PP / OS number (from calendar)">
+            <button type="button" class="row-clear admin-only" data-clear="${i}" title="Clear row" aria-label="Clear row">×</button>
           </div>
         </td>
         <td>
@@ -643,6 +724,7 @@
             <span class="dash">-</span>
             <select data-row="${i}" data-field="timeOut" aria-label="Time out"></select>
           </div>
+          <small class="row-by" data-row="${i}" data-field="by"></small>
         </td>`;
 
       fillSelect(tr.querySelector('[data-field=timeIn]'), durationOptions, '—');
@@ -656,22 +738,50 @@
 
 
   // =========================================
+  // ROLE
+  // =========================================
+
+  let userName = safeGet(NAME_KEY);
+  let adminToken = safeGet(ADMIN_KEY);
+  let isAdmin = false;
+
+  // Staff: every field is read-only except Time in / Time out
+  // PP / OS: only filled from the calendar of the selected date (nobody types it)
+  function applyRole() {
+
+    document.body.classList.toggle('staff', !isAdmin);
+
+    document.querySelectorAll('main input, main select').forEach(el => {
+      const field = el.dataset.field;
+      const isTime = field === 'timeIn' || field === 'timeOut';
+      el.disabled = (!isAdmin && !isTime) || field === 'kind';
+    });
+
+    $('who').innerHTML = `${escapeHtml(userName)}` +
+      (isAdmin ? '<span class="role-badge">Admin</span>' : '<span class="role-badge badge-hidden">Team</span>');
+
+  }
+
+
+  // =========================================
   // READ / WRITE FORM
   // =========================================
 
   let currentId = newId();
+  let currentSaved = false;
+  const dirtyTimes = new Set();
 
   function readForm() {
 
     const rows = [];
 
     for (let i = 0; i < ROWS; i++) {
-      const get = f => document.querySelector(`[data-row="${i}"][data-field="${f}"]`).value;
       rows.push({
-        kind: get('kind'),
-        number: get('number').trim(),
-        timeIn: get('timeIn'),
-        timeOut: get('timeOut')
+        kind: rowField(i, 'kind').value,
+        number: rowField(i, 'number').value.trim(),
+        timeIn: rowField(i, 'timeIn').value,
+        timeOut: rowField(i, 'timeOut').value,
+        timesDirty: dirtyTimes.has(i)
       });
     }
 
@@ -703,6 +813,20 @@
   }
 
 
+  function writeRow(i, row) {
+
+    rowField(i, 'kind').value = row.kind || 'PP';
+    rowField(i, 'number').value = row.number || '';
+    rowField(i, 'timeIn').value = row.timeIn || '';
+    rowField(i, 'timeOut').value = row.timeOut || '';
+
+    rowField(i, 'by').textContent = row.timeBy && row.timeAt && (row.timeIn || row.timeOut)
+      ? `${row.timeBy} · ${new Date(row.timeAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
+      : '';
+
+  }
+
+
   function writeForm(sheet) {
 
     const date = sheet.date || {};
@@ -725,19 +849,14 @@
 
     const rows = sheet.rows || [];
 
-    for (let i = 0; i < ROWS; i++) {
-      const row = rows[i] || {};
-      const set = (f, v) => {
-        document.querySelector(`[data-row="${i}"][data-field="${f}"]`).value = v;
-      };
-      set('kind', row.kind || 'PP');
-      set('number', row.number || '');
-      set('timeIn', row.timeIn || '');
-      set('timeOut', row.timeOut || '');
-    }
+    for (let i = 0; i < ROWS; i++) writeRow(i, rows[i] || {});
 
     $('sign-out').value = sheet.signOut || '';
     $('sign-in').value = sheet.signIn || '';
+
+    dirtyTimes.clear();
+
+    markInvalid([]);
 
   }
 
@@ -746,8 +865,6 @@
   // API
   // =========================================
 
-  let userName = safeGet(NAME_KEY);
-
   async function api(path, options = {}) {
 
     const res = await fetch(path, {
@@ -755,6 +872,7 @@
       headers: {
         'content-type': 'application/json',
         'x-user-name': encodeURIComponent(userName),
+        ...(adminToken ? { 'x-admin-token': adminToken } : {}),
         ...(options.headers || {})
       }
     });
@@ -766,25 +884,30 @@
   }
 
 
+  let sheetList = [];
+
   async function loadList() {
 
     try {
 
-      const list = await api('/api/sheets');
+      sheetList = await api('/api/sheets');
 
-      $('saved-count').textContent = list.length;
+      $('saved-count').textContent = sheetList.length;
 
-      $('saved-list').innerHTML = list.map(s => `
+      $('saved-list').innerHTML = sheetList.map(s => `
         <li>
           <span>
             <strong>${escapeHtml(s.date?.text || 'No date')}</strong>
             ${s.day ? '· ' + escapeHtml(s.day) : ''}
             ${(s.team || []).filter(Boolean).length ? '· ' + escapeHtml(s.team.filter(Boolean).join(', ')) : ''}
+            ${isAdmin ? `<span class="role-badge ${s.visible ? 'badge-visible' : 'badge-hidden'}">${s.visible ? 'Visible to team' : 'Hidden'}</span>` : ''}
             <br><small>Last saved by ${escapeHtml(s.updatedBy)} · ${new Date(s.updatedAt).toLocaleString('en-GB')}</small>
           </span>
           <button type="button" data-open="${escapeHtml(s.id)}">Open</button>
-          <button type="button" class="danger" data-delete="${escapeHtml(s.id)}">Delete</button>
-        </li>`).join('') || '<li><span><small>No saved sheets yet.</small></span></li>';
+          ${isAdmin ? `
+            <button type="button" data-visible="${escapeHtml(s.id)}" data-to="${s.visible ? '0' : '1'}">${s.visible ? 'Hide' : 'Show to team'}</button>
+            <button type="button" class="danger" data-delete="${escapeHtml(s.id)}">Delete</button>` : ''}
+        </li>`).join('') || `<li><span><small>${isAdmin ? 'No saved sheets yet.' : 'No sheet available.'}</small></span></li>`;
 
     } catch (err) {
 
@@ -795,18 +918,34 @@
   }
 
 
+  // ---------- ADMIN: save whole sheet ----------
+
   async function save() {
+
+    const bad = invalidRows();
+
+    markInvalid(bad);
+
+    if (bad.length) {
+      setStatus(`Row(s) ${bad.map(i => i + 1).join(', ')} are not in this day's calendar — clear them (×) first`, 'err');
+      return;
+    }
 
     setStatus('Saving…');
 
     try {
 
-      await api('/api/sheets/' + currentId, {
+      const sheet = await api('/api/sheets/' + currentId, {
         method: 'PUT',
         body: JSON.stringify(readForm())
       });
 
-      setStatus('Saved ' + new Date().toLocaleTimeString('en-GB'), 'ok');
+      // Shows times the team may have entered meanwhile
+      writeForm(sheet);
+
+      currentSaved = true;
+
+      setStatus('Saved ' + timeNow(), 'ok');
 
       loadList();
 
@@ -819,7 +958,59 @@
   }
 
 
-  async function openSheet(id) {
+  // ---------- TEAM: each time change is saved at once ----------
+
+  async function saveTimes(i) {
+
+    setStatus('Saving…');
+
+    try {
+
+      const sheet = await api(`/api/sheets/${currentId}/times`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          row: i,
+          timeIn: rowField(i, 'timeIn').value,
+          timeOut: rowField(i, 'timeOut').value
+        })
+      });
+
+      writeRow(i, sheet.rows[i] || {});
+
+      setStatus('Saved ' + timeNow(), 'ok');
+
+    } catch (err) {
+
+      setStatus('Save failed: ' + err.message, 'err');
+
+    }
+
+  }
+
+
+  async function setVisible(id, visible) {
+
+    try {
+
+      await api(`/api/sheets/${id}/visibility`, {
+        method: 'POST',
+        body: JSON.stringify({ visible })
+      });
+
+      setStatus(visible ? 'Visible to team' : 'Hidden from team', 'ok');
+
+      loadList();
+
+    } catch (err) {
+
+      setStatus('Failed: ' + err.message, 'err');
+
+    }
+
+  }
+
+
+  async function openSheet(id, quiet) {
 
     try {
 
@@ -827,13 +1018,18 @@
 
       currentId = sheet.id;
 
+      currentSaved = true;
+
       writeForm(sheet);
 
       renderCalendar();
 
-      setStatus('Opened', 'ok');
+      showSheet(true);
 
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (!quiet) {
+        setStatus('Opened', 'ok');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
 
     } catch (err) {
 
@@ -869,6 +1065,8 @@
 
     currentId = newId();
 
+    currentSaved = false;
+
     writeForm({ date: todayDate() });
 
     suggestWeekday();
@@ -880,15 +1078,25 @@
   }
 
 
+  function showSheet(show) {
+
+    document.querySelector('main').classList.toggle('hidden', !show);
+
+    $('empty-staff').classList.toggle('hidden', show);
+
+  }
+
+
   // =========================================
-  // CALENDAR
+  // CALENDAR (admin)
   //
-  // Loaded once when the page opens and again only
-  // when Refresh is clicked (no polling, saves requests).
+  // Loaded when the page opens and when Refresh is clicked.
   // Changing the date filters what is already loaded.
   // =========================================
 
   let calendars = [];
+  let calendarLoaded = false;
+  let calendarRange = { from: '', to: '' };
 
   function todayDate() {
     const [y, m, d] = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Dublin' })
@@ -921,7 +1129,7 @@
     if (!iso) return [];
     const list = [];
     calendars.forEach((cal, priority) => {
-      for (const ev of cal.events) {
+      for (const ev of cal.events || []) {
         if (ev.date === iso) list.push({ ...ev, calendar: cal.name, color: cal.color, priority });
       }
     });
@@ -929,7 +1137,11 @@
       a.priority - b.priority || (a.start || '').localeCompare(b.start || ''));
   }
 
+  let needsChoice = new Set();
+
   function renderCalendar() {
+
+    if (!isAdmin) return;
 
     const iso = selectedIso();
 
@@ -944,29 +1156,42 @@
     const events = calendarEventsForDate();
 
     $('cal-events').innerHTML = events.map((ev, i) => {
+
       const refs = extractRefs(ev);
       const when = ev.start ? ev.start + (ev.end ? '–' + ev.end : '') : 'All day';
+
+      // One button per PP / OS found, so only the chosen one is used
+      const picks = refs.length
+        ? refs.map((r, j) => `<button type="button" data-ev="${i}" data-ref="${j}">Add ${escapeHtml(r.kind + ' ' + r.number)}</button>`).join('')
+        : '<span class="none">No PP / OS number</span>';
+
       return `
-        <li style="--c:${escapeHtml(ev.color)}">
+        <li style="--c:${escapeHtml(ev.color)}" class="${needsChoice.has(i) ? 'choose' : ''}">
           <span class="when">${escapeHtml(when)}</span>
           <span class="what">
             ${escapeHtml(ev.title)}
-            ${refs.length ? `<span class="tags">· ${refs.map(r => escapeHtml(r.kind + ' ' + r.number)).join(', ')}</span>` : ''}
-            <small>${escapeHtml(ev.calendar)}${ev.location ? ' · ' + escapeHtml(ev.location) : ''}</small>
+            <small>${escapeHtml(ev.calendar)}${ev.location ? ' · ' + escapeHtml(ev.location) : ''}${refs.length > 1 ? ' · choose PP or OS' : ''}</small>
           </span>
-          <button type="button" data-add="${i}">Add</button>
+          <span class="picks">${picks}</span>
         </li>`;
+
     }).join('') || `<li class="empty">${iso ? 'No events for this date.' : ''}</li>`;
 
   }
 
   async function loadCalendar() {
 
+    if (!isAdmin) return;
+
     try {
 
       const data = await api('/api/calendar');
 
       calendars = data.calendars || [];
+
+      calendarLoaded = calendars.some(c => !c.error);
+
+      calendarRange = { from: data.from || '', to: data.to || '' };
 
       const when = data.syncedAt ? new Date(data.syncedAt) : new Date();
 
@@ -979,12 +1204,10 @@
 
     }
 
+    needsChoice = new Set();
+
     renderCalendar();
 
-  }
-
-  function rowField(i, f) {
-    return document.querySelector(`[data-row="${i}"][data-field="${f}"]`);
   }
 
   function rowHasRef(kind, number) {
@@ -1001,44 +1224,113 @@
     return -1;
   }
 
-  // Adds the PP / OS numbers of one event (or its title if none) to empty rows
-  function addEventToRows(ev) {
+  // Puts one PP or OS number in the next empty row
+  function addRef(ref) {
 
-    if (!ev) return 0;
-
-    const refs = extractRefs(ev);
-    const items = refs.length ? refs : [{ kind: 'PP', number: ev.title }];
-    let added = 0;
-
-    for (const ref of items) {
-      if (rowHasRef(ref.kind, ref.number)) continue;
-      const i = nextEmptyRow();
-      if (i < 0) { setStatus('Sheet is full (9 rows)', 'err'); break; }
-      rowField(i, 'kind').value = ref.kind;
-      rowField(i, 'number').value = ref.number;
-      added++;
+    if (rowHasRef(ref.kind, ref.number)) {
+      setStatus(`${ref.kind} ${ref.number} is already on the sheet`);
+      return 0;
     }
 
-    return added;
+    const i = nextEmptyRow();
+
+    if (i < 0) {
+      setStatus('Sheet is full (9 rows)', 'err');
+      return 0;
+    }
+
+    rowField(i, 'kind').value = ref.kind;
+    rowField(i, 'number').value = ref.number;
+
+    setStatus(`Added ${ref.kind} ${ref.number} — remember to Save`, 'ok');
+
+    return 1;
 
   }
 
-  // Only events with a PP / OS number are used for the automatic fill
+  // Events with a single PP / OS are added; events with both are left for you to choose
   function fillFromCalendar() {
 
     let added = 0;
 
-    for (const ev of calendarEventsForDate()) {
-      if (extractRefs(ev).length) added += addEventToRows(ev);
-    }
+    needsChoice = new Set();
 
-    setStatus(added ? `Added ${added} from calendar` : 'Nothing new to add', added ? 'ok' : '');
+    calendarEventsForDate().forEach((ev, i) => {
+      const refs = extractRefs(ev);
+      if (refs.length === 1) added += addRef(refs[0]) ? 1 : 0;
+      if (refs.length > 1) needsChoice.add(i);
+    });
+
+    renderCalendar();
+
+    const parts = [];
+    if (added) parts.push(`Added ${added}`);
+    if (needsChoice.size) parts.push(`${needsChoice.size} event(s): choose PP or OS`);
+
+    setStatus(parts.join(' · ') || 'Nothing new to add', added ? 'ok' : '');
 
   }
 
+
+  // PP / OS allowed on the selected date = the ones in that day's events
+  function allowedRefs() {
+    const set = new Set();
+    for (const ev of calendarEventsForDate()) {
+      for (const r of extractRefs(ev)) set.add(r.kind + ' ' + r.number);
+    }
+    return set;
+  }
+
+  // Can we check this date? (calendar loaded and date inside the synced period)
+  function canCheckDate() {
+    const iso = selectedIso();
+    return isAdmin && calendarLoaded && iso &&
+      (!calendarRange.from || iso >= calendarRange.from) &&
+      (!calendarRange.to || iso <= calendarRange.to);
+  }
+
+  function invalidRows() {
+    if (!canCheckDate()) return [];
+    const allowed = allowedRefs();
+    const bad = [];
+    for (let i = 0; i < ROWS; i++) {
+      const number = rowField(i, 'number').value.trim();
+      if (number && !allowed.has(rowField(i, 'kind').value + ' ' + number)) bad.push(i);
+    }
+    return bad;
+  }
+
+  function markInvalid(bad) {
+    document.querySelectorAll('#rows tr').forEach((tr, i) => tr.classList.toggle('invalid', bad.includes(i)));
+  }
+
+  function clearRow(i) {
+    writeRow(i, {});
+    dirtyTimes.add(i);
+  }
+
+  // Date changed: drop the rows that are not in the new day's events
+  function pruneRowsForDate() {
+    const bad = invalidRows();
+    bad.forEach(clearRow);
+    markInvalid([]);
+    if (bad.length) setStatus(`Removed ${bad.length} item(s) not in this day's calendar — remember to Save`, 'err');
+  }
+
+
   function refreshAll() {
 
-    loadList();
+    loadList().then(() => {
+
+      if (isAdmin) return;
+
+      // Team: keep the open sheet if still visible, otherwise open the first one
+      const stillThere = sheetList.some(s => s.id === currentId);
+
+      if (sheetList.length) openSheet(stillThere ? currentId : sheetList[0].id, true);
+      else showSheet(false);
+
+    });
 
     loadCalendar();
 
@@ -1053,22 +1345,74 @@
 
     $('gate').classList.remove('hidden');
     $('gate-name').value = userName;
+    $('gate-pass').value = '';
+    $('gate-error').textContent = '';
+    $('gate-pass-wrap').classList.toggle('hidden', !adminToken);
     $('gate-name').focus();
 
   }
 
 
-  async function enter(name) {
+  async function enter(name, password) {
 
     userName = name;
 
     safeSet(NAME_KEY, name);
 
-    $('who').innerHTML = `${escapeHtml(name)} <small>signed in</small>`;
+    $('gate-error').textContent = '';
+
+    if (password) {
+
+      try {
+
+        const res = await api('/api/admin/login', {
+          method: 'POST',
+          body: JSON.stringify({ password })
+        });
+
+        adminToken = res.token;
+
+      } catch (err) {
+
+        $('gate-error').textContent = err.message;
+
+        return;
+
+      }
+
+    } else if ($('gate-pass-wrap').classList.contains('hidden')) {
+
+      // Entering as team drops any admin session on this device
+      adminToken = '';
+
+    }
+
+    try {
+
+      isAdmin = adminToken ? (await api('/api/me')).admin : false;
+
+    } catch {
+
+      isAdmin = false;
+
+    }
+
+    if (!isAdmin) adminToken = '';
+
+    safeSet(ADMIN_KEY, adminToken);
 
     $('gate').classList.add('hidden');
 
+    applyRole();
+
     try { await api('/api/hello', { method: 'POST' }); } catch {}
+
+    $('saved-details').open = !isAdmin;
+
+    if (isAdmin) {
+      showSheet(true);
+      if (!currentSaved) newSheet();
+    }
 
     refreshAll();
 
@@ -1082,32 +1426,74 @@
   $('gate-form').addEventListener('submit', e => {
     e.preventDefault();
     const name = $('gate-name').value.trim();
-    if (name) enter(name);
+    if (name) enter(name, $('gate-pass').value);
+  });
+
+  $('gate-admin-toggle').addEventListener('click', () => {
+    const wrap = $('gate-pass-wrap');
+    wrap.classList.toggle('hidden');
+    if (wrap.classList.contains('hidden')) $('gate-pass').value = '';
+    else $('gate-pass').focus();
   });
 
   $('change-user').addEventListener('click', showGate);
 
-  $('date-month').addEventListener('change', () => { refreshDays(); suggestWeekday(); renderCalendar(); });
-  $('date-year').addEventListener('change', () => { refreshDays(); suggestWeekday(); renderCalendar(); });
-  $('date-day').addEventListener('change', () => { suggestWeekday(); renderCalendar(); });
+  function dateChanged() {
+    suggestWeekday();
+    needsChoice = new Set();
+    renderCalendar();
+    pruneRowsForDate();
+  }
+
+  $('date-month').addEventListener('change', () => { refreshDays(); dateChanged(); });
+  $('date-year').addEventListener('change', () => { refreshDays(); dateChanged(); });
+  $('date-day').addEventListener('change', dateChanged);
+
+  // Time dropdowns: team saves at once, admin marks the row and saves with Save
+  $('rows').addEventListener('click', e => {
+    const btn = e.target.closest('[data-clear]');
+    if (!btn || !isAdmin) return;
+    clearRow(Number(btn.dataset.clear));
+    markInvalid(invalidRows());
+    setStatus('Row cleared — remember to Save');
+  });
+
+  $('rows').addEventListener('change', e => {
+    const field = e.target.dataset.field;
+    if (field !== 'timeIn' && field !== 'timeOut') return;
+    const i = Number(e.target.dataset.row);
+    if (isAdmin) dirtyTimes.add(i);
+    else saveTimes(i);
+  });
 
   $('btn-save').addEventListener('click', save);
-  $('btn-new').addEventListener('click', () => {
-    if (confirm('Start a new blank sheet? Unsaved changes will be lost.')) newSheet();
-  });
   $('btn-refresh').addEventListener('click', refreshAll);
   $('btn-fill').addEventListener('click', fillFromCalendar);
 
+  $('btn-new').addEventListener('click', () => {
+    if (confirm('Start a new blank sheet? Unsaved changes will be lost.')) newSheet();
+  });
+
   $('cal-events').addEventListener('click', e => {
-    const btn = e.target.closest('[data-add]');
-    if (btn) addEventToRows(calendarEventsForDate()[Number(btn.dataset.add)]);
+    const btn = e.target.closest('[data-ev]');
+    if (!btn) return;
+    const i = Number(btn.dataset.ev);
+    const ev = calendarEventsForDate()[i];
+    if (!ev) return;
+    const ref = extractRefs(ev)[Number(btn.dataset.ref)];
+    if (ref && addRef(ref)) {
+      needsChoice.delete(i);
+      renderCalendar();
+    }
   });
 
   $('saved-list').addEventListener('click', e => {
     const open = e.target.closest('[data-open]');
     const del = e.target.closest('[data-delete]');
+    const vis = e.target.closest('[data-visible]');
     if (open) openSheet(open.dataset.open);
     if (del) deleteSheet(del.dataset.delete);
+    if (vis) setVisible(vis.dataset.visible, vis.dataset.to === '1');
   });
 
 
@@ -1117,7 +1503,7 @@
 
   buildHeader();
   buildRows();
-  newSheet();
+  showSheet(false);
 
   // Name is asked on every page load (pre-filled with the last one used)
   showGate();
