@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/32754963/README.md)
 # Delivery Sheet
 
 Digital version of the paper delivery sheet, served by a Cloudflare Worker.
