@@ -968,7 +968,10 @@
 
       calendars = data.calendars || [];
 
-      $('cal-updated').textContent = 'updated ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      const when = data.syncedAt ? new Date(data.syncedAt) : new Date();
+
+      $('cal-updated').textContent = (data.syncedAt ? 'synced from Google ' : 'updated ') +
+        when.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 
     } catch (err) {
 
