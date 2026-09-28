@@ -1,0 +1,1149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Delivery Sheet</title>
+<style>
+  :root {
+    --ink: #1d1d1f;
+    --line: #2b2b2b;
+    --muted: #6b6b6b;
+    --bg: #eef0f3;
+    --paper: #ffffff;
+    --accent: #1f5fbf;
+    --ok: #1e8a4c;
+    --danger: #c0392b;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: Calibri, "Segoe UI", Arial, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+  }
+
+  /* ---------- NAME GATE ---------- */
+
+  #gate {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(20, 24, 31, .75);
+    z-index: 50;
+    padding: 16px;
+  }
+
+  #gate.hidden { display: none; }
+
+  .gate-card {
+    background: var(--paper);
+    border-radius: 12px;
+    padding: 28px 24px;
+    width: 100%;
+    max-width: 360px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, .3);
+  }
+
+  .gate-card h1 { margin: 0 0 6px; font-size: 22px; }
+  .gate-card p { margin: 0 0 18px; color: var(--muted); }
+
+  .gate-card input {
+    width: 100%;
+    font-size: 17px;
+    padding: 10px 12px;
+    border: 1px solid #bbb;
+    border-radius: 8px;
+    margin-bottom: 14px;
+  }
+
+  /* ---------- TOOLBAR ---------- */
+
+  .toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    padding: 10px 16px;
+    background: #fff;
+    border-bottom: 1px solid #d5d8dd;
+  }
+
+  .toolbar .user { font-weight: 600; margin-right: auto; }
+  .toolbar .user small { font-weight: 400; color: var(--muted); }
+
+  button, .btn {
+    font: inherit;
+    font-size: 15px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid #c4c8ce;
+    background: #fff;
+    cursor: pointer;
+  }
+
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.danger { color: var(--danger); }
+  button.link { border: 0; background: none; color: var(--accent); padding: 0 4px; }
+
+  #status { font-size: 14px; color: var(--muted); min-width: 120px; }
+  #status.ok { color: var(--ok); }
+  #status.err { color: var(--danger); }
+
+  /* ---------- SAVED LIST ---------- */
+
+  #saved {
+    max-width: 820px;
+    margin: 12px auto 0;
+    padding: 0 16px;
+  }
+
+  #saved details {
+    background: #fff;
+    border: 1px solid #d5d8dd;
+    border-radius: 8px;
+    padding: 8px 12px;
+  }
+
+  #saved summary { cursor: pointer; font-weight: 600; }
+  #saved ul { list-style: none; padding: 0; margin: 8px 0 0; }
+
+  #saved li {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 0;
+    border-top: 1px solid #eee;
+    font-size: 14px;
+  }
+
+  #saved li span { flex: 1; }
+  #saved li small { color: var(--muted); }
+
+  /* ---------- CALENDAR PANEL ---------- */
+
+  #calendar {
+    max-width: 820px;
+    margin: 12px auto 0;
+    padding: 0 16px;
+  }
+
+  #calendar details {
+    background: #fff;
+    border: 1px solid #d5d8dd;
+    border-radius: 8px;
+    padding: 8px 12px;
+  }
+
+  #calendar summary { cursor: pointer; font-weight: 600; }
+  #calendar summary small { font-weight: 400; color: var(--muted); }
+
+  .cal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin: 8px 0;
+  }
+
+  .cal-actions small { color: var(--muted); margin-right: auto; }
+
+  #cal-list { list-style: none; padding: 0; margin: 0; }
+
+  #cal-list li {
+    display: grid;
+    grid-template-columns: auto 92px 1fr auto;
+    gap: 10px;
+    align-items: center;
+    padding: 6px 0;
+    border-top: 1px solid #eee;
+    font-size: 14px;
+  }
+
+  #cal-list li.muted { display: block; color: var(--muted); }
+  #cal-list li.added { opacity: .5; }
+  #cal-list input[type=checkbox] { width: 18px; height: 18px; }
+  #cal-list .time { font-variant-numeric: tabular-nums; color: var(--muted); }
+  #cal-list .loc { display: block; color: var(--muted); font-size: 13px; }
+
+  .ref {
+    font-weight: 700;
+    white-space: nowrap;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: #eef3fb;
+  }
+
+  .ref.none { background: #fdf0ee; color: var(--danger); font-weight: 400; }
+
+  @media (max-width: 640px) {
+    #cal-list li { grid-template-columns: auto 1fr; }
+    #cal-list .time { grid-column: 2; }
+    #cal-list .ref { grid-column: 2; justify-self: start; }
+  }
+
+  /* ---------- PAPER ---------- */
+
+  .paper {
+    background: var(--paper);
+    max-width: 820px;
+    margin: 12px auto 24px;
+    padding: 22px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, .08);
+  }
+
+  .sheet { border: 2px solid var(--line); }
+
+  .head {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px 24px;
+    padding: 12px 14px;
+    border-bottom: 2px solid var(--line);
+  }
+
+  .field label, .label {
+    display: block;
+    font-weight: 700;
+    font-size: 17px;
+    margin-bottom: 4px;
+  }
+
+  .date-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .date-row .sep { font-weight: 700; font-size: 18px; }
+
+  select, input[type=text] {
+    font: inherit;
+    font-size: 16px;
+    padding: 6px 8px;
+    border: 0;
+    border-bottom: 2px solid var(--line);
+    background: transparent;
+    border-radius: 0;
+    min-width: 0;
+  }
+
+  select:focus, input[type=text]:focus {
+    outline: none;
+    border-bottom-color: var(--accent);
+    background: #f4f8ff;
+  }
+
+  .team input { width: 100%; margin-bottom: 6px; }
+
+  .van-table {
+    border-collapse: collapse;
+    width: 100%;
+    max-width: 260px;
+  }
+
+  .van-table td {
+    border: 2px solid var(--line);
+    padding: 4px 6px;
+    height: 34px;
+  }
+
+  .van-table td.check { width: 44px; text-align: center; }
+  .van-table td.plate { font-weight: 700; text-align: center; }
+  .van-table input[type=checkbox] { width: 20px; height: 20px; }
+  .van-table input[type=text] { width: 100%; border: 0; text-align: center; font-weight: 700; }
+
+  .wide { width: 100%; }
+
+  /* ---------- DELIVERIES ---------- */
+
+  table.deliveries {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+
+  table.deliveries th,
+  table.deliveries td {
+    border: 2px solid var(--line);
+    padding: 4px 6px;
+  }
+
+  table.deliveries tr > :first-child { border-left: 0; }
+  table.deliveries tr > :last-child { border-right: 0; }
+  table.deliveries tr:last-child td { border-bottom: 0; }
+  table.deliveries thead th { border-top: 0; }
+
+  table.deliveries th { font-size: 20px; font-weight: 700; }
+  table.deliveries th.small { font-size: 13px; }
+
+  table.deliveries td { height: 56px; vertical-align: middle; }
+
+  col.c-del { width: 11%; }
+  col.c-chk { width: 11%; }
+  col.c-pp { width: 28%; }
+
+  .pp {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .pp select { flex: 0 0 auto; font-weight: 700; }
+  .pp input { flex: 1; width: 100%; }
+
+  .times {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .times .dash { font-weight: 700; font-size: 20px; }
+  .times select { width: 100%; }
+
+  .sign {
+    padding: 22px 14px 6px;
+    display: grid;
+    gap: 16px;
+    max-width: 420px;
+    margin: 0 auto;
+  }
+
+  .sign input { width: 100%; }
+
+  @media (max-width: 640px) {
+    .paper { padding: 8px; }
+    .head { grid-template-columns: 1fr; }
+    table.deliveries th { font-size: 14px; }
+    table.deliveries th.small { font-size: 11px; }
+    col.c-del, col.c-chk { width: 12%; }
+    col.c-pp { width: 34%; }
+    .times { grid-template-columns: 1fr; gap: 2px; }
+    .times .dash { display: none; }
+    select, input[type=text] { font-size: 14px; padding: 4px; }
+  }
+
+  /* ---------- PRINT (A4, like the paper form) ---------- */
+
+  @media print {
+    @page { size: A4; margin: 12mm; }
+
+    body { background: #fff; }
+
+    .toolbar, #saved, #calendar, #gate { display: none !important; }
+
+    .paper { box-shadow: none; margin: 0; padding: 0; max-width: none; }
+
+    select {
+      -webkit-appearance: none;
+      appearance: none;
+      background: none;
+    }
+
+    select, input[type=text] { border-bottom-color: transparent; }
+
+    .head select, .head input[type=text], .sign input { border-bottom-color: var(--line); }
+
+    table.deliveries td { height: 64px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= NAME GATE ================= -->
+<div id="gate">
+  <form class="gate-card" id="gate-form">
+    <h1>Delivery Sheet</h1>
+    <p>Please enter your name to continue.</p>
+    <input id="gate-name" type="text" autocomplete="name" placeholder="Your name" maxlength="60" required>
+    <button class="primary wide" type="submit">Enter</button>
+  </form>
+</div>
+
+<!-- ================= TOOLBAR ================= -->
+<div class="toolbar">
+  <div class="user">
+    <span id="who"></span>
+    <button class="link" id="change-user" type="button">change</button>
+  </div>
+  <span id="status"></span>
+  <button type="button" id="btn-new">New</button>
+  <button type="button" class="primary" id="btn-save">Save</button>
+  <button type="button" id="btn-print">Print</button>
+</div>
+
+<!-- ================= SAVED SHEETS ================= -->
+<div id="saved">
+  <details>
+    <summary>Saved sheets (<span id="saved-count">0</span>)</summary>
+    <ul id="saved-list"></ul>
+  </details>
+</div>
+
+<!-- ================= GOOGLE CALENDAR ================= -->
+<div id="calendar">
+  <details id="cal-box" open>
+    <summary>Google Calendar <small id="cal-summary">– choose a date</small></summary>
+    <div class="cal-actions">
+      <small id="cal-synced"></small>
+      <button type="button" id="cal-select-all">Select all</button>
+      <button type="button" id="cal-refresh">Refresh</button>
+      <button type="button" class="primary" id="cal-add">Add selected to sheet</button>
+    </div>
+    <ul id="cal-list"><li class="muted">Pick the date of the sheet to see that day's calendar events.</li></ul>
+  </details>
+</div>
+
+<!-- ================= SHEET ================= -->
+<main class="paper">
+  <div class="sheet">
+
+    <div class="head">
+
+      <div>
+        <div class="field">
+          <span class="label">Date:</span>
+          <div class="date-row">
+            <select id="date-day" aria-label="Day of month"></select>
+            <span class="sep">/</span>
+            <select id="date-month" aria-label="Month"></select>
+            <span class="sep">/</span>
+            <select id="date-year" aria-label="Year"></select>
+          </div>
+        </div>
+
+        <div class="field" style="margin-top:14px">
+          <label for="weekday">Day</label>
+          <select id="weekday" class="wide"></select>
+        </div>
+
+        <div class="field" style="margin-top:14px">
+          <label for="message">Message send:</label>
+          <input id="message" type="text" class="wide">
+        </div>
+      </div>
+
+      <div>
+        <div class="field team">
+          <span class="label">Delivery team:</span>
+          <input id="team-1" type="text" aria-label="Delivery team member 1">
+          <input id="team-2" type="text" aria-label="Delivery team member 2">
+        </div>
+
+        <div class="field" style="margin-top:10px">
+          <span class="label">Van:</span>
+          <table class="van-table">
+            <tr>
+              <td class="check"><input type="checkbox" id="van-1" aria-label="Van 241D46401"></td>
+              <td class="plate">241D46401</td>
+            </tr>
+            <tr>
+              <td class="check"><input type="checkbox" id="van-2" aria-label="Van 251D8219"></td>
+              <td class="plate">251D8219</td>
+            </tr>
+            <tr>
+              <td class="check"><input type="checkbox" id="van-3" aria-label="Other van"></td>
+              <td><input type="text" id="van-3-plate" aria-label="Other van plate"></td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <table class="deliveries">
+      <colgroup>
+        <col class="c-del"><col class="c-chk"><col class="c-pp"><col>
+      </colgroup>
+      <thead>
+        <tr>
+          <th class="small">Del. No.</th>
+          <th class="small">Confirm<br>check</th>
+          <th>PP / OS</th>
+          <th>Time in &nbsp;-&nbsp; Time out</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+
+  </div>
+
+  <div class="sign">
+    <div class="field">
+      <label for="sign-out">Sign out:</label>
+      <input id="sign-out" type="text">
+    </div>
+    <div class="field">
+      <label for="sign-in">Sign In:</label>
+      <input id="sign-in" type="text">
+    </div>
+  </div>
+</main>
+
+<script>
+(() => {
+
+  // =========================================
+  // CONSTANTS
+  // =========================================
+
+  const ROWS = 9;
+
+  const MONTHS = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  const WEEKDAYS = [
+    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+  ];
+
+  const YEARS = [2026, 2027];
+
+  // 30 minutes -> 6 hours, every 15 minutes
+  const DURATIONS = [];
+
+  for (let m = 30; m <= 360; m += 15) {
+    DURATIONS.push(m);
+  }
+
+  const NAME_KEY = 'delivery-sheet:name';
+
+  const $ = id => document.getElementById(id);
+
+
+  // =========================================
+  // HELPERS
+  // =========================================
+
+  function ordinal(n) {
+    const s = ['th', 'st', 'nd', 'rd'];
+    const v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+  }
+
+  function durationLabel(minutes) {
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    const parts = [];
+    if (h) parts.push(h + (h === 1 ? ' hour' : ' hours'));
+    if (m) parts.push(m + ' minutes');
+    return parts.join(' ');
+  }
+
+  function fillSelect(select, options, placeholder) {
+    select.innerHTML = '';
+    const empty = document.createElement('option');
+    empty.value = '';
+    empty.textContent = placeholder;
+    select.appendChild(empty);
+    for (const [value, label] of options) {
+      const opt = document.createElement('option');
+      opt.value = String(value);
+      opt.textContent = label;
+      select.appendChild(opt);
+    }
+  }
+
+  function safeGet(key) {
+    try { return localStorage.getItem(key) || ''; } catch { return ''; }
+  }
+
+  function safeSet(key, value) {
+    try { localStorage.setItem(key, value); } catch {}
+  }
+
+  function newId() {
+    return (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
+  }
+
+  function setStatus(text, kind = '') {
+    const el = $('status');
+    el.textContent = text;
+    el.className = kind;
+  }
+
+  function escapeHtml(text) {
+    return String(text ?? '').replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[c]);
+  }
+
+
+  // =========================================
+  // BUILD FORM
+  // =========================================
+
+  function buildHeader() {
+
+    fillSelect(
+      $('date-month'),
+      MONTHS.map((name, i) => [i + 1, name]),
+      'Month'
+    );
+
+    fillSelect(
+      $('date-year'),
+      YEARS.map(y => [y, String(y)]),
+      'Year'
+    );
+
+    $('date-year').value = String(YEARS[0]);
+
+    fillSelect(
+      $('weekday'),
+      WEEKDAYS.map(d => [d, d]),
+      'Select day'
+    );
+
+    refreshDays();
+
+  }
+
+
+  // Day-of-month list follows the chosen month / year
+  function refreshDays() {
+
+    const select = $('date-day');
+    const current = select.value;
+    const month = Number($('date-month').value);
+    const year = Number($('date-year').value) || YEARS[0];
+    const max = month ? new Date(year, month, 0).getDate() : 31;
+
+    const days = [];
+    for (let d = 1; d <= max; d++) days.push([d, ordinal(d)]);
+
+    fillSelect(select, days, 'Day');
+
+    if (current && Number(current) <= max) select.value = current;
+
+  }
+
+
+  // Suggest the weekday from the chosen date (still editable)
+  function suggestWeekday() {
+
+    const d = Number($('date-day').value);
+    const m = Number($('date-month').value);
+    const y = Number($('date-year').value);
+
+    if (!d || !m || !y) return;
+
+    const js = new Date(y, m - 1, d).getDay();
+    $('weekday').value = WEEKDAYS[(js + 6) % 7];
+
+  }
+
+
+  function buildRows() {
+
+    const tbody = $('rows');
+    const durationOptions = DURATIONS.map(m => [m, durationLabel(m)]);
+
+    tbody.innerHTML = '';
+
+    for (let i = 0; i < ROWS; i++) {
+
+      const tr = document.createElement('tr');
+
+      tr.innerHTML = `
+        <td></td>
+        <td></td>
+        <td>
+          <div class="pp">
+            <select data-row="${i}" data-field="kind" aria-label="PP or OS">
+              <option value="PP">PP</option>
+              <option value="OS">OS</option>
+            </select>
+            <input type="text" data-row="${i}" data-field="number" inputmode="numeric" aria-label="PP / OS number">
+          </div>
+        </td>
+        <td>
+          <div class="times">
+            <select data-row="${i}" data-field="timeIn" aria-label="Time in"></select>
+            <span class="dash">-</span>
+            <select data-row="${i}" data-field="timeOut" aria-label="Time out"></select>
+          </div>
+        </td>`;
+
+      fillSelect(tr.querySelector('[data-field=timeIn]'), durationOptions, '—');
+      fillSelect(tr.querySelector('[data-field=timeOut]'), durationOptions, '—');
+
+      tbody.appendChild(tr);
+
+    }
+
+  }
+
+
+  // =========================================
+  // READ / WRITE FORM
+  // =========================================
+
+  let currentId = newId();
+
+  function readForm() {
+
+    const rows = [];
+
+    for (let i = 0; i < ROWS; i++) {
+      const get = f => document.querySelector(`[data-row="${i}"][data-field="${f}"]`).value;
+      rows.push({
+        kind: get('kind'),
+        number: get('number').trim(),
+        timeIn: get('timeIn'),
+        timeOut: get('timeOut')
+      });
+    }
+
+    const d = $('date-day').value;
+    const m = $('date-month').value;
+    const y = $('date-year').value;
+
+    return {
+      date: {
+        day: d,
+        month: m,
+        year: y,
+        text: (d && m && y) ? `${ordinal(Number(d))} ${MONTHS[m - 1]} ${y}` : ''
+      },
+      day: $('weekday').value,
+      message: $('message').value.trim(),
+      team: [$('team-1').value.trim(), $('team-2').value.trim()],
+      vans: {
+        v1: $('van-1').checked,
+        v2: $('van-2').checked,
+        v3: $('van-3').checked,
+        v3Plate: $('van-3-plate').value.trim()
+      },
+      rows,
+      signOut: $('sign-out').value.trim(),
+      signIn: $('sign-in').value.trim()
+    };
+
+  }
+
+
+  function writeForm(sheet) {
+
+    const date = sheet.date || {};
+
+    $('date-year').value = date.year || String(YEARS[0]);
+    $('date-month').value = date.month || '';
+    refreshDays();
+    $('date-day').value = date.day || '';
+
+    $('weekday').value = sheet.day || '';
+    $('message').value = sheet.message || '';
+    $('team-1').value = (sheet.team || [])[0] || '';
+    $('team-2').value = (sheet.team || [])[1] || '';
+
+    const vans = sheet.vans || {};
+    $('van-1').checked = !!vans.v1;
+    $('van-2').checked = !!vans.v2;
+    $('van-3').checked = !!vans.v3;
+    $('van-3-plate').value = vans.v3Plate || '';
+
+    const rows = sheet.rows || [];
+
+    for (let i = 0; i < ROWS; i++) {
+      const row = rows[i] || {};
+      const set = (f, v) => {
+        document.querySelector(`[data-row="${i}"][data-field="${f}"]`).value = v;
+      };
+      set('kind', row.kind || 'PP');
+      set('number', row.number || '');
+      set('timeIn', row.timeIn || '');
+      set('timeOut', row.timeOut || '');
+    }
+
+    $('sign-out').value = sheet.signOut || '';
+    $('sign-in').value = sheet.signIn || '';
+
+  }
+
+
+  // =========================================
+  // API
+  // =========================================
+
+  let userName = safeGet(NAME_KEY);
+
+  async function api(path, options = {}) {
+
+    const res = await fetch(path, {
+      ...options,
+      headers: {
+        'content-type': 'application/json',
+        'x-user-name': encodeURIComponent(userName),
+        ...(options.headers || {})
+      }
+    });
+
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
+
+    return res.json();
+
+  }
+
+
+  async function loadList() {
+
+    try {
+
+      const list = await api('/api/sheets');
+
+      $('saved-count').textContent = list.length;
+
+      $('saved-list').innerHTML = list.map(s => `
+        <li>
+          <span>
+            <strong>${escapeHtml(s.date?.text || 'No date')}</strong>
+            ${s.day ? '· ' + escapeHtml(s.day) : ''}
+            ${(s.team || []).filter(Boolean).length ? '· ' + escapeHtml(s.team.filter(Boolean).join(', ')) : ''}
+            <br><small>Last saved by ${escapeHtml(s.updatedBy)} · ${new Date(s.updatedAt).toLocaleString('en-GB')}</small>
+          </span>
+          <button type="button" data-open="${escapeHtml(s.id)}">Open</button>
+          <button type="button" class="danger" data-delete="${escapeHtml(s.id)}">Delete</button>
+        </li>`).join('') || '<li><span><small>No saved sheets yet.</small></span></li>';
+
+    } catch (err) {
+
+      setStatus('Could not load list', 'err');
+
+    }
+
+  }
+
+
+  async function save() {
+
+    setStatus('Saving…');
+
+    try {
+
+      await api('/api/sheets/' + currentId, {
+        method: 'PUT',
+        body: JSON.stringify(readForm())
+      });
+
+      setStatus('Saved ' + new Date().toLocaleTimeString('en-GB'), 'ok');
+
+      loadList();
+
+    } catch (err) {
+
+      setStatus('Save failed: ' + err.message, 'err');
+
+    }
+
+  }
+
+
+  async function openSheet(id) {
+
+    try {
+
+      const sheet = await api('/api/sheets/' + id);
+
+      currentId = sheet.id;
+
+      writeForm(sheet);
+
+      loadCalendar();
+
+      setStatus('Opened', 'ok');
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    } catch (err) {
+
+      setStatus('Open failed', 'err');
+
+    }
+
+  }
+
+
+  async function deleteSheet(id) {
+
+    if (!confirm('Delete this sheet?')) return;
+
+    try {
+
+      await api('/api/sheets/' + id, { method: 'DELETE' });
+
+      if (id === currentId) newSheet();
+
+      loadList();
+
+    } catch (err) {
+
+      setStatus('Delete failed', 'err');
+
+    }
+
+  }
+
+
+  function newSheet() {
+
+    currentId = newId();
+
+    writeForm({});
+
+    loadCalendar();
+
+    setStatus('');
+
+  }
+
+
+  // =========================================
+  // GOOGLE CALENDAR
+  // =========================================
+
+  let calEvents = [];
+  let calDate = '';
+
+  function sheetIsoDate() {
+
+    const d = $('date-day').value;
+    const m = $('date-month').value;
+    const y = $('date-year').value;
+
+    if (!d || !m || !y) return '';
+
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
+  }
+
+
+  function numbersOnSheet() {
+
+    const set = new Set();
+
+    for (let i = 0; i < ROWS; i++) {
+      const kind = document.querySelector(`[data-row="${i}"][data-field="kind"]`).value;
+      const num = document.querySelector(`[data-row="${i}"][data-field="number"]`).value.trim();
+      if (num) set.add(kind + ':' + num);
+    }
+
+    return set;
+
+  }
+
+
+  function renderCalendar(syncedAt) {
+
+    const list = $('cal-list');
+
+    if (!calDate) {
+      $('cal-summary').textContent = '– choose a date';
+      list.innerHTML = '<li class="muted">Pick the date of the sheet to see that day\'s calendar events.</li>';
+      return;
+    }
+
+    $('cal-summary').textContent = `– ${calEvents.length} event${calEvents.length === 1 ? '' : 's'} on this day`;
+
+    if (syncedAt !== undefined) {
+      $('cal-synced').textContent = syncedAt
+        ? 'Calendar synced ' + new Date(syncedAt).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })
+        : 'Calendar never synced yet';
+    }
+
+    if (!calEvents.length) {
+      list.innerHTML = '<li class="muted">No calendar events for this day.</li>';
+      return;
+    }
+
+    const onSheet = numbersOnSheet();
+
+    list.innerHTML = calEvents.map((ev, i) => {
+
+      const added = ev.number && onSheet.has(ev.kind + ':' + ev.number);
+      const time = ev.allDay ? 'All day' : `${ev.start}–${ev.end}`;
+      const ref = ev.number
+        ? `<span class="ref">${escapeHtml(ev.kind)} ${escapeHtml(ev.number)}</span>`
+        : '<span class="ref none">no PP/OS</span>';
+
+      return `
+        <li class="${added ? 'added' : ''}">
+          <input type="checkbox" data-cal="${i}" ${(added || !ev.number) ? 'disabled' : ''} aria-label="Select event">
+          <span class="time">${escapeHtml(time)}</span>
+          <span>${escapeHtml(ev.title || '(no title)')}${ev.location ? `<span class="loc">${escapeHtml(ev.location)}</span>` : ''}</span>
+          ${added ? '<span class="ref">on sheet</span>' : ref}
+        </li>`;
+
+    }).join('');
+
+  }
+
+
+  async function loadCalendar() {
+
+    calDate = sheetIsoDate();
+
+    if (!calDate) {
+      calEvents = [];
+      renderCalendar();
+      return;
+    }
+
+    const asked = calDate;
+
+    try {
+
+      const data = await api('/api/calendar?date=' + asked);
+
+      if (asked !== calDate) return;   // date changed meanwhile
+
+      calEvents = data.events || [];
+      renderCalendar(data.syncedAt);
+
+    } catch (err) {
+
+      $('cal-list').innerHTML = '<li class="muted">Could not load calendar events.</li>';
+
+    }
+
+  }
+
+
+  function addSelectedToSheet() {
+
+    const picked = [...document.querySelectorAll('#cal-list [data-cal]:checked')]
+      .map(box => calEvents[Number(box.dataset.cal)]);
+
+    if (!picked.length) {
+      setStatus('Tick at least one event', 'err');
+      return;
+    }
+
+    const onSheet = numbersOnSheet();
+    let placed = 0;
+    let noRoom = 0;
+
+    for (const ev of picked) {
+
+      if (!ev.number || onSheet.has(ev.kind + ':' + ev.number)) continue;
+
+      // first row with an empty number box
+      let row = -1;
+      for (let i = 0; i < ROWS; i++) {
+        const num = document.querySelector(`[data-row="${i}"][data-field="number"]`);
+        if (!num.value.trim()) { row = i; break; }
+      }
+
+      if (row === -1) { noRoom++; continue; }
+
+      document.querySelector(`[data-row="${row}"][data-field="kind"]`).value = ev.kind || 'PP';
+      document.querySelector(`[data-row="${row}"][data-field="number"]`).value = ev.number;
+
+      onSheet.add(ev.kind + ':' + ev.number);
+      placed++;
+
+    }
+
+    renderCalendar();
+
+    setStatus(
+      `${placed} added from calendar` + (noRoom ? ` · ${noRoom} did not fit (sheet full)` : '') + ' – remember to Save',
+      noRoom ? 'err' : 'ok'
+    );
+
+  }
+
+
+  // =========================================
+  // NAME GATE
+  // =========================================
+
+  function showGate() {
+
+    $('gate').classList.remove('hidden');
+    $('gate-name').value = userName;
+    $('gate-name').focus();
+
+  }
+
+
+  async function enter(name) {
+
+    userName = name;
+
+    safeSet(NAME_KEY, name);
+
+    $('who').innerHTML = `${escapeHtml(name)} <small>signed in</small>`;
+
+    $('gate').classList.add('hidden');
+
+    try { await api('/api/hello', { method: 'POST' }); } catch {}
+
+    loadList();
+
+  }
+
+
+  // =========================================
+  // EVENTS
+  // =========================================
+
+  $('gate-form').addEventListener('submit', e => {
+    e.preventDefault();
+    const name = $('gate-name').value.trim();
+    if (name) enter(name);
+  });
+
+  $('change-user').addEventListener('click', showGate);
+
+  $('date-month').addEventListener('change', () => { refreshDays(); suggestWeekday(); loadCalendar(); });
+  $('date-year').addEventListener('change', () => { refreshDays(); suggestWeekday(); loadCalendar(); });
+  $('date-day').addEventListener('change', () => { suggestWeekday(); loadCalendar(); });
+
+  $('cal-refresh').addEventListener('click', loadCalendar);
+  $('cal-add').addEventListener('click', addSelectedToSheet);
+  $('cal-select-all').addEventListener('click', () => {
+    document.querySelectorAll('#cal-list [data-cal]:not(:disabled)').forEach(b => { b.checked = true; });
+  });
+
+  // keep "on sheet" marks up to date when numbers are typed by hand
+  $('rows').addEventListener('change', () => { if (calDate) renderCalendar(); });
+
+  $('btn-save').addEventListener('click', save);
+  $('btn-new').addEventListener('click', () => {
+    if (confirm('Start a new blank sheet? Unsaved changes will be lost.')) newSheet();
+  });
+  $('btn-print').addEventListener('click', () => window.print());
+
+  $('saved-list').addEventListener('click', e => {
+    const open = e.target.closest('[data-open]');
+    const del = e.target.closest('[data-delete]');
+    if (open) openSheet(open.dataset.open);
+    if (del) deleteSheet(del.dataset.delete);
+  });
+
+
+  // =========================================
+  // INIT
+  // =========================================
+
+  buildHeader();
+  buildRows();
+
+  // Name is asked on every page load (pre-filled with the last one used)
+  showGate();
+
+})();
+</script>
+</body>
+</html>
