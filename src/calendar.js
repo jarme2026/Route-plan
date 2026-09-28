@@ -1,8 +1,9 @@
 // =========================================
-// GOOGLE CALENDAR (secret iCal address)
+// GOOGLE CALENDAR
 //
-// Each calendar is read from its "Secret address in iCal format"
-// (Google Calendar → Settings → calendar → Integrate calendar).
+// 1) CAL_SCRIPT_URL: Google Apps Script Web App (google-apps-script/Code.gs)
+// 2) or CAL_WAREHOUSE / CAL_LIVING_BRAY: secret iCal addresses
+//
 // Only called when the page opens or when Refresh is clicked.
 // =========================================
 
@@ -235,8 +236,42 @@ export function parseIcs(text, from, to) {
 
 // ---------- FETCH ALL CALENDARS ----------
 
+// Preferred: Google Apps Script Web App (CAL_SCRIPT_URL = …/exec?token=…)
+async function loadFromScript(url, from, to) {
+
+  const target = new URL(url);
+
+  target.searchParams.set('from', from);
+  target.searchParams.set('to', to);
+
+  try {
+
+    const res = await fetch(target, { redirect: 'follow' });
+
+    const data = await res.json();
+
+    if (data.error) throw new Error(data.error);
+
+    return data.calendars;
+
+  } catch (err) {
+
+    return CALENDARS.map(cal => ({
+      id: cal.id, name: cal.name, color: cal.color,
+      error: 'Script: ' + (err.message || 'failed').slice(0, 60),
+      events: []
+    }));
+
+  }
+
+}
+
+
 export async function loadCalendars(env, from, to) {
 
+  if (env.CAL_SCRIPT_URL) return loadFromScript(env.CAL_SCRIPT_URL, from, to);
+
+  // Fallback: secret iCal addresses (CAL_WAREHOUSE / CAL_LIVING_BRAY)
   const results = await Promise.all(CALENDARS.map(async cal => {
 
     const url = env[cal.secret];
