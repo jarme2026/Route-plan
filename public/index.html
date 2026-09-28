@@ -127,68 +127,6 @@
   #saved li span { flex: 1; }
   #saved li small { color: var(--muted); }
 
-  /* ---------- CALENDAR PANEL ---------- */
-
-  #calendar {
-    max-width: 820px;
-    margin: 12px auto 0;
-    padding: 0 16px;
-  }
-
-  #calendar details {
-    background: #fff;
-    border: 1px solid #d5d8dd;
-    border-radius: 8px;
-    padding: 8px 12px;
-  }
-
-  #calendar summary { cursor: pointer; font-weight: 600; }
-  #calendar summary small { font-weight: 400; color: var(--muted); }
-
-  .cal-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-    margin: 8px 0;
-  }
-
-  .cal-actions small { color: var(--muted); margin-right: auto; }
-
-  #cal-list { list-style: none; padding: 0; margin: 0; }
-
-  #cal-list li {
-    display: grid;
-    grid-template-columns: auto 92px 1fr auto;
-    gap: 10px;
-    align-items: center;
-    padding: 6px 0;
-    border-top: 1px solid #eee;
-    font-size: 14px;
-  }
-
-  #cal-list li.muted { display: block; color: var(--muted); }
-  #cal-list li.added { opacity: .5; }
-  #cal-list input[type=checkbox] { width: 18px; height: 18px; }
-  #cal-list .time { font-variant-numeric: tabular-nums; color: var(--muted); }
-  #cal-list .loc { display: block; color: var(--muted); font-size: 13px; }
-
-  .ref {
-    font-weight: 700;
-    white-space: nowrap;
-    padding: 2px 8px;
-    border-radius: 6px;
-    background: #eef3fb;
-  }
-
-  .ref.none { background: #fdf0ee; color: var(--danger); font-weight: 400; }
-
-  @media (max-width: 640px) {
-    #cal-list li { grid-template-columns: auto 1fr; }
-    #cal-list .time { grid-column: 2; }
-    #cal-list .ref { grid-column: 2; justify-self: start; }
-  }
-
   /* ---------- PAPER ---------- */
 
   .paper {
@@ -332,29 +270,62 @@
     select, input[type=text] { font-size: 14px; padding: 4px; }
   }
 
-  /* ---------- PRINT (A4, like the paper form) ---------- */
+  /* ---------- CALENDAR ---------- */
 
-  @media print {
-    @page { size: A4; margin: 12mm; }
-
-    body { background: #fff; }
-
-    .toolbar, #saved, #calendar, #gate { display: none !important; }
-
-    .paper { box-shadow: none; margin: 0; padding: 0; max-width: none; }
-
-    select {
-      -webkit-appearance: none;
-      appearance: none;
-      background: none;
-    }
-
-    select, input[type=text] { border-bottom-color: transparent; }
-
-    .head select, .head input[type=text], .sign input { border-bottom-color: var(--line); }
-
-    table.deliveries td { height: 64px; }
+  #calendar {
+    max-width: 820px;
+    margin: 12px auto 0;
+    padding: 0 16px;
   }
+
+  .cal-card {
+    background: #fff;
+    border: 1px solid #d5d8dd;
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+
+  .cal-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .cal-head strong { margin-right: auto; }
+  .cal-head small { color: var(--muted); }
+
+  .cal-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; margin-top: 6px; }
+  .cal-legend span::before {
+    content: '';
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    margin-right: 4px;
+    background: var(--c);
+  }
+  .cal-legend .err { color: var(--danger); }
+
+  #cal-events { list-style: none; padding: 0; margin: 8px 0 0; }
+
+  #cal-events li {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 7px 8px;
+    margin-top: 6px;
+    border-left: 4px solid var(--c);
+    background: #f7f8fa;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+
+  #cal-events li .when { font-weight: 700; min-width: 92px; }
+  #cal-events li .what { flex: 1; min-width: 0; }
+  #cal-events li .what small { display: block; color: var(--muted); }
+  #cal-events li .tags { color: var(--accent); font-weight: 700; font-size: 13px; }
+  #cal-events .empty { border: 0; background: none; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -376,9 +347,22 @@
     <button class="link" id="change-user" type="button">change</button>
   </div>
   <span id="status"></span>
+  <button type="button" id="btn-refresh">Refresh</button>
   <button type="button" id="btn-new">New</button>
   <button type="button" class="primary" id="btn-save">Save</button>
-  <button type="button" id="btn-print">Print</button>
+</div>
+
+<!-- ================= CALENDAR ================= -->
+<div id="calendar">
+  <div class="cal-card">
+    <div class="cal-head">
+      <strong>Calendar · <span id="cal-date">select a date</span></strong>
+      <small id="cal-updated"></small>
+      <button type="button" id="btn-fill">Fill sheet from calendar</button>
+    </div>
+    <div class="cal-legend" id="cal-legend"></div>
+    <ul id="cal-events"></ul>
+  </div>
 </div>
 
 <!-- ================= SAVED SHEETS ================= -->
@@ -386,20 +370,6 @@
   <details>
     <summary>Saved sheets (<span id="saved-count">0</span>)</summary>
     <ul id="saved-list"></ul>
-  </details>
-</div>
-
-<!-- ================= GOOGLE CALENDAR ================= -->
-<div id="calendar">
-  <details id="cal-box" open>
-    <summary>Google Calendar <small id="cal-summary">– choose a date</small></summary>
-    <div class="cal-actions">
-      <small id="cal-synced"></small>
-      <button type="button" id="cal-select-all">Select all</button>
-      <button type="button" id="cal-refresh">Refresh</button>
-      <button type="button" class="primary" id="cal-add">Add selected to sheet</button>
-    </div>
-    <ul id="cal-list"><li class="muted">Pick the date of the sheet to see that day's calendar events.</li></ul>
   </details>
 </div>
 
@@ -859,7 +829,7 @@
 
       writeForm(sheet);
 
-      loadCalendar();
+      renderCalendar();
 
       setStatus('Opened', 'ok');
 
@@ -899,9 +869,11 @@
 
     currentId = newId();
 
-    writeForm({});
+    writeForm({ date: todayDate() });
 
-    loadCalendar();
+    suggestWeekday();
+
+    renderCalendar();
 
     setStatus('');
 
@@ -909,157 +881,163 @@
 
 
   // =========================================
-  // GOOGLE CALENDAR
+  // CALENDAR
+  //
+  // Loaded once when the page opens and again only
+  // when Refresh is clicked (no polling, saves requests).
+  // Changing the date filters what is already loaded.
   // =========================================
 
-  let calEvents = [];
-  let calDate = '';
+  let calendars = [];
 
-  function sheetIsoDate() {
+  function todayDate() {
+    const [y, m, d] = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Dublin' })
+      .format(new Date()).split('-');
+    return { day: String(Number(d)), month: String(Number(m)), year: y };
+  }
 
-    const d = $('date-day').value;
-    const m = $('date-month').value;
-    const y = $('date-year').value;
-
+  function selectedIso() {
+    const d = $('date-day').value, m = $('date-month').value, y = $('date-year').value;
     if (!d || !m || !y) return '';
-
     return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-
   }
 
-
-  function numbersOnSheet() {
-
-    const set = new Set();
-
-    for (let i = 0; i < ROWS; i++) {
-      const kind = document.querySelector(`[data-row="${i}"][data-field="kind"]`).value;
-      const num = document.querySelector(`[data-row="${i}"][data-field="number"]`).value.trim();
-      if (num) set.add(kind + ':' + num);
+  // PP / OS numbers found in an event
+  function extractRefs(ev) {
+    const text = `${ev.title} ${ev.description} ${ev.location}`;
+    const refs = [];
+    const re = /\b(PP|OS)\s*[-:#.]?\s*(\d{3,})/gi;
+    let m;
+    while ((m = re.exec(text))) {
+      const ref = { kind: m[1].toUpperCase(), number: m[2] };
+      if (!refs.some(r => r.kind === ref.kind && r.number === ref.number)) refs.push(ref);
     }
-
-    return set;
-
+    return refs;
   }
 
+  // Events of the selected date, calendar priority first, then by time
+  function calendarEventsForDate() {
+    const iso = selectedIso();
+    if (!iso) return [];
+    const list = [];
+    calendars.forEach((cal, priority) => {
+      for (const ev of cal.events) {
+        if (ev.date === iso) list.push({ ...ev, calendar: cal.name, color: cal.color, priority });
+      }
+    });
+    return list.sort((a, b) =>
+      a.priority - b.priority || (a.start || '').localeCompare(b.start || ''));
+  }
 
-  function renderCalendar(syncedAt) {
+  function renderCalendar() {
 
-    const list = $('cal-list');
+    const iso = selectedIso();
 
-    if (!calDate) {
-      $('cal-summary').textContent = '– choose a date';
-      list.innerHTML = '<li class="muted">Pick the date of the sheet to see that day\'s calendar events.</li>';
-      return;
-    }
+    $('cal-date').textContent = iso
+      ? new Date(iso + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+      : 'select a date';
 
-    $('cal-summary').textContent = `– ${calEvents.length} event${calEvents.length === 1 ? '' : 's'} on this day`;
+    $('cal-legend').innerHTML = calendars.map(c =>
+      `<span style="--c:${escapeHtml(c.color)}" class="${c.error ? 'err' : ''}">${escapeHtml(c.name)}${c.error ? ' — ' + escapeHtml(c.error) : ''}</span>`
+    ).join('');
 
-    if (syncedAt !== undefined) {
-      $('cal-synced').textContent = syncedAt
-        ? 'Calendar synced ' + new Date(syncedAt).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })
-        : 'Calendar never synced yet';
-    }
+    const events = calendarEventsForDate();
 
-    if (!calEvents.length) {
-      list.innerHTML = '<li class="muted">No calendar events for this day.</li>';
-      return;
-    }
-
-    const onSheet = numbersOnSheet();
-
-    list.innerHTML = calEvents.map((ev, i) => {
-
-      const added = ev.number && onSheet.has(ev.kind + ':' + ev.number);
-      const time = ev.allDay ? 'All day' : `${ev.start}–${ev.end}`;
-      const ref = ev.number
-        ? `<span class="ref">${escapeHtml(ev.kind)} ${escapeHtml(ev.number)}</span>`
-        : '<span class="ref none">no PP/OS</span>';
-
+    $('cal-events').innerHTML = events.map((ev, i) => {
+      const refs = extractRefs(ev);
+      const when = ev.start ? ev.start + (ev.end ? '–' + ev.end : '') : 'All day';
       return `
-        <li class="${added ? 'added' : ''}">
-          <input type="checkbox" data-cal="${i}" ${(added || !ev.number) ? 'disabled' : ''} aria-label="Select event">
-          <span class="time">${escapeHtml(time)}</span>
-          <span>${escapeHtml(ev.title || '(no title)')}${ev.location ? `<span class="loc">${escapeHtml(ev.location)}</span>` : ''}</span>
-          ${added ? '<span class="ref">on sheet</span>' : ref}
+        <li style="--c:${escapeHtml(ev.color)}">
+          <span class="when">${escapeHtml(when)}</span>
+          <span class="what">
+            ${escapeHtml(ev.title)}
+            ${refs.length ? `<span class="tags">· ${refs.map(r => escapeHtml(r.kind + ' ' + r.number)).join(', ')}</span>` : ''}
+            <small>${escapeHtml(ev.calendar)}${ev.location ? ' · ' + escapeHtml(ev.location) : ''}</small>
+          </span>
+          <button type="button" data-add="${i}">Add</button>
         </li>`;
-
-    }).join('');
+    }).join('') || `<li class="empty">${iso ? 'No events for this date.' : ''}</li>`;
 
   }
-
 
   async function loadCalendar() {
 
-    calDate = sheetIsoDate();
-
-    if (!calDate) {
-      calEvents = [];
-      renderCalendar();
-      return;
-    }
-
-    const asked = calDate;
-
     try {
 
-      const data = await api('/api/calendar?date=' + asked);
+      const data = await api('/api/calendar');
 
-      if (asked !== calDate) return;   // date changed meanwhile
+      calendars = data.calendars || [];
 
-      calEvents = data.events || [];
-      renderCalendar(data.syncedAt);
+      $('cal-updated').textContent = 'updated ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
     } catch (err) {
 
-      $('cal-list').innerHTML = '<li class="muted">Could not load calendar events.</li>';
-
-    }
-
-  }
-
-
-  function addSelectedToSheet() {
-
-    const picked = [...document.querySelectorAll('#cal-list [data-cal]:checked')]
-      .map(box => calEvents[Number(box.dataset.cal)]);
-
-    if (!picked.length) {
-      setStatus('Tick at least one event', 'err');
-      return;
-    }
-
-    const onSheet = numbersOnSheet();
-    let placed = 0;
-    let noRoom = 0;
-
-    for (const ev of picked) {
-
-      if (!ev.number || onSheet.has(ev.kind + ':' + ev.number)) continue;
-
-      // first row with an empty number box
-      let row = -1;
-      for (let i = 0; i < ROWS; i++) {
-        const num = document.querySelector(`[data-row="${i}"][data-field="number"]`);
-        if (!num.value.trim()) { row = i; break; }
-      }
-
-      if (row === -1) { noRoom++; continue; }
-
-      document.querySelector(`[data-row="${row}"][data-field="kind"]`).value = ev.kind || 'PP';
-      document.querySelector(`[data-row="${row}"][data-field="number"]`).value = ev.number;
-
-      onSheet.add(ev.kind + ':' + ev.number);
-      placed++;
+      $('cal-updated').textContent = 'calendar unavailable';
 
     }
 
     renderCalendar();
 
-    setStatus(
-      `${placed} added from calendar` + (noRoom ? ` · ${noRoom} did not fit (sheet full)` : '') + ' – remember to Save',
-      noRoom ? 'err' : 'ok'
-    );
+  }
+
+  function rowField(i, f) {
+    return document.querySelector(`[data-row="${i}"][data-field="${f}"]`);
+  }
+
+  function rowHasRef(kind, number) {
+    for (let i = 0; i < ROWS; i++) {
+      if (rowField(i, 'kind').value === kind && rowField(i, 'number').value.trim() === number) return true;
+    }
+    return false;
+  }
+
+  function nextEmptyRow() {
+    for (let i = 0; i < ROWS; i++) {
+      if (!rowField(i, 'number').value.trim()) return i;
+    }
+    return -1;
+  }
+
+  // Adds the PP / OS numbers of one event (or its title if none) to empty rows
+  function addEventToRows(ev) {
+
+    if (!ev) return 0;
+
+    const refs = extractRefs(ev);
+    const items = refs.length ? refs : [{ kind: 'PP', number: ev.title }];
+    let added = 0;
+
+    for (const ref of items) {
+      if (rowHasRef(ref.kind, ref.number)) continue;
+      const i = nextEmptyRow();
+      if (i < 0) { setStatus('Sheet is full (9 rows)', 'err'); break; }
+      rowField(i, 'kind').value = ref.kind;
+      rowField(i, 'number').value = ref.number;
+      added++;
+    }
+
+    return added;
+
+  }
+
+  // Only events with a PP / OS number are used for the automatic fill
+  function fillFromCalendar() {
+
+    let added = 0;
+
+    for (const ev of calendarEventsForDate()) {
+      if (extractRefs(ev).length) added += addEventToRows(ev);
+    }
+
+    setStatus(added ? `Added ${added} from calendar` : 'Nothing new to add', added ? 'ok' : '');
+
+  }
+
+  function refreshAll() {
+
+    loadList();
+
+    loadCalendar();
 
   }
 
@@ -1089,7 +1067,7 @@
 
     try { await api('/api/hello', { method: 'POST' }); } catch {}
 
-    loadList();
+    refreshAll();
 
   }
 
@@ -1106,24 +1084,21 @@
 
   $('change-user').addEventListener('click', showGate);
 
-  $('date-month').addEventListener('change', () => { refreshDays(); suggestWeekday(); loadCalendar(); });
-  $('date-year').addEventListener('change', () => { refreshDays(); suggestWeekday(); loadCalendar(); });
-  $('date-day').addEventListener('change', () => { suggestWeekday(); loadCalendar(); });
-
-  $('cal-refresh').addEventListener('click', loadCalendar);
-  $('cal-add').addEventListener('click', addSelectedToSheet);
-  $('cal-select-all').addEventListener('click', () => {
-    document.querySelectorAll('#cal-list [data-cal]:not(:disabled)').forEach(b => { b.checked = true; });
-  });
-
-  // keep "on sheet" marks up to date when numbers are typed by hand
-  $('rows').addEventListener('change', () => { if (calDate) renderCalendar(); });
+  $('date-month').addEventListener('change', () => { refreshDays(); suggestWeekday(); renderCalendar(); });
+  $('date-year').addEventListener('change', () => { refreshDays(); suggestWeekday(); renderCalendar(); });
+  $('date-day').addEventListener('change', () => { suggestWeekday(); renderCalendar(); });
 
   $('btn-save').addEventListener('click', save);
   $('btn-new').addEventListener('click', () => {
     if (confirm('Start a new blank sheet? Unsaved changes will be lost.')) newSheet();
   });
-  $('btn-print').addEventListener('click', () => window.print());
+  $('btn-refresh').addEventListener('click', refreshAll);
+  $('btn-fill').addEventListener('click', fillFromCalendar);
+
+  $('cal-events').addEventListener('click', e => {
+    const btn = e.target.closest('[data-add]');
+    if (btn) addEventToRows(calendarEventsForDate()[Number(btn.dataset.add)]);
+  });
 
   $('saved-list').addEventListener('click', e => {
     const open = e.target.closest('[data-open]');
@@ -1139,6 +1114,7 @@
 
   buildHeader();
   buildRows();
+  newSheet();
 
   // Name is asked on every page load (pre-filled with the last one used)
   showGate();
