@@ -1,4 +1,4 @@
-[README.md](https://github.com/user-attachments/files/32752537/README.md)
+[README.md](https://github.com/user-attachments/files/32753224/README.md)
 # Delivery Sheet
 
 Digital version of the paper delivery sheet, served by a Cloudflare Worker.
@@ -10,18 +10,20 @@ Digital version of the paper delivery sheet, served by a Cloudflare Worker.
 - Del. No. and Confirm check columns stay blank.
 - PP / OS: choose PP or OS and type the number.
 - Time in / Time out: 30 minutes → 6 hours, in 15-minute steps.
-- Print button outputs an A4 page laid out like the paper form.
-- Google Calendar panel: after choosing the date, shows that day's calendar events
-  (with the PP / OS number read from the title or description). Tick them and click
-  "Add selected to sheet" to fill the first empty rows. Events already on the sheet
-  are greyed out; events without a PP / OS number can't be added.
+- Online only (no print).
+- Calendar panel shows the events of the selected date from the two ticked
+  Google calendars, in priority order: **Warehouse/Deliveries**, then **Living Bray**.
+  PP / OS numbers found in an event (e.g. `PP 123456`, `OS-7788`) are highlighted;
+  "Fill sheet from calendar" puts them in the empty rows, "Add" does it for one event.
+- Data is loaded only when the page opens and when **Refresh** is clicked
+  (no polling, no cron), to keep Worker requests low.
 
 ## Structure
 
 ```
 public/index.html   page (HTML + CSS + JS in one file)
-src/index.js        Worker + Durable Object (SheetStore) storing sheets, access log and calendar
-google-apps-script.js  code for the Google Sheet (Extensions -> Apps Script) that pushes the calendar
+src/index.js        Worker + Durable Object (SheetStore) storing sheets and access log
+src/calendar.js     reads the Google calendars (iCal) and filters the events
 wrangler.jsonc      Cloudflare config
 ```
 
@@ -31,21 +33,28 @@ wrangler.jsonc      Cloudflare config
 |---|---|---|
 | POST | /api/hello | log access |
 | GET | /api/access-log | last 200 accesses |
+| GET | /api/calendar | events from the calendars (-7 to +45 days) |
 | GET | /api/sheets | list sheets |
 | GET/PUT/DELETE | /api/sheets/:id | read / save / delete one sheet |
-| GET | /api/calendar?date=YYYY-MM-DD | calendar events of one day |
-| POST | /api/calendar/sync | Google Apps Script pushes events (header `x-sync-key`, no name needed) |
 
-## Calendar sync
+## Calendars (Google)
 
-The Worker never reads Google directly (the company account blocks public links).
-Instead the Apps Script in the Google Sheet pushes the events every 5 minutes.
+For each calendar: Google Calendar → Settings → click the calendar →
+**Integrate calendar** → copy **Secret address in iCal format**. Then:
 
-1. Cloudflare: Worker -> Settings -> Variables and Secrets -> add Secret `SYNC_KEY`
-   (or `npx wrangler secret put SYNC_KEY`).
-2. Google Sheet -> Extensions -> Apps Script: paste `google-apps-script.js`,
-   set `WORKER_URL` and `SYNC_KEY`, run `atualizarPlanilha` once, keep the
-   5-minute time-driven trigger on `atualizarPlanilha`.
+```
+npx wrangler secret put CAL_WAREHOUSE      # Warehouse/Deliveries
+npx wrangler secret put CAL_LIVING_BRAY    # Living Bray
+```
+
+For `wrangler dev`, put the same values in a `.dev.vars` file (do not commit it):
+
+```
+CAL_WAREHOUSE=https://calendar.google.com/calendar/ical/.../basic.ics
+CAL_LIVING_BRAY=https://calendar.google.com/calendar/ical/.../basic.ics
+```
+
+To change names, colours or priority, edit `CALENDARS` in `src/calendar.js`.
 
 ## Run locally
 
