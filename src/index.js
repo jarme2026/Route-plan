@@ -5,6 +5,8 @@
 // Sheets + access log kept in one Durable Object
 // =========================================
 
+import { loadCalendars } from './calendar.js';
+
 
 const JSON_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
@@ -58,45 +60,6 @@ export class SheetStore {
       userName(request);
 
 
-    // ---------- CALENDAR SYNC (from Google Apps Script) ----------
-    // Key already checked in the Worker before reaching here.
-
-    if (path === '/api/calendar/sync' && method === 'POST') {
-
-      const body =
-        await request.json().catch(() => null);
-
-      if (!body || !Array.isArray(body.events)) {
-
-        return json({ error: 'Invalid body' }, 400);
-
-      }
-
-      const clean = v => String(v ?? '').slice(0, 300);
-
-      const events =
-        body.events.slice(0, 3000).map(ev => ({
-          date: clean(ev.date).slice(0, 10),
-          start: clean(ev.start).slice(0, 5),
-          end: clean(ev.end).slice(0, 5),
-          allDay: !!ev.allDay,
-          title: clean(ev.title),
-          location: clean(ev.location),
-          kind: ev.kind === 'OS' ? 'OS' : (ev.kind === 'PP' ? 'PP' : ''),
-          number: clean(ev.number).slice(0, 30),
-          minutes: Number(ev.minutes) || 0
-        }));
-
-      await this.ctx.storage.put('calendar', {
-        syncedAt: new Date().toISOString(),
-        events
-      });
-
-      return json({ ok: true, count: events.length });
-
-    }
-
-
     if (!name) {
 
       return json({ error: 'Name required' }, 401);
@@ -125,32 +88,6 @@ export class SheetStore {
       return json(
         (await this.ctx.storage.get('access-log')) || []
       );
-
-    }
-
-
-    // ---------- CALENDAR (events of one day) ----------
-
-    if (path === '/api/calendar' && method === 'GET') {
-
-      const date =
-        url.searchParams.get('date') || '';
-
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-
-        return json({ error: 'date must be YYYY-MM-DD' }, 400);
-
-      }
-
-      const cal =
-        (await this.ctx.storage.get('calendar')) || { syncedAt: null, events: [] };
-
-      const events =
-        cal.events
-          .filter(ev => ev.date === date)
-          .sort((a, b) => (a.start || '').localeCompare(b.start || ''));
-
-      return json({ syncedAt: cal.syncedAt, date, events });
 
     }
 
@@ -266,21 +203,24 @@ export default {
       new URL(request.url);
 
 
+    // Calendar is read straight from Google (no Durable Object)
+    if (url.pathname === '/api/calendar' && request.method === 'GET') {
+
+      if (!userName(request)) return json({ error: 'Name required' }, 401);
+
+      const iso = /^\d{4}-\d{2}-\d{2}$/;
+      const today = new Date().toISOString().slice(0, 10);
+      const shift = (d, n) => new Date(Date.parse(d) + n * 86400000).toISOString().slice(0, 10);
+
+      const from = iso.test(url.searchParams.get('from') || '') ? url.searchParams.get('from') : shift(today, -7);
+      const to = iso.test(url.searchParams.get('to') || '') ? url.searchParams.get('to') : shift(today, 45);
+
+      return json({ from, to, calendars: await loadCalendars(env, from, to) });
+
+    }
+
+
     if (url.pathname.startsWith('/api/')) {
-
-      // Calendar push from Google needs the secret SYNC_KEY
-      if (url.pathname === '/api/calendar/sync') {
-
-        const key =
-          request.headers.get('x-sync-key') || '';
-
-        if (!env.SYNC_KEY || key !== env.SYNC_KEY) {
-
-          return json({ error: 'Wrong or missing sync key' }, 401);
-
-        }
-
-      }
 
       const id =
         env.SHEET_STORE.idFromName('main');
