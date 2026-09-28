@@ -1,4 +1,4 @@
-[README.md](https://github.com/user-attachments/files/32753224/README.md)
+[README.md](https://github.com/user-attachments/files/32754963/README.md)
 # Delivery Sheet
 
 Digital version of the paper delivery sheet, served by a Cloudflare Worker.
@@ -39,22 +39,37 @@ wrangler.jsonc      Cloudflare config
 
 ## Calendars (Google)
 
-For each calendar: Google Calendar → Settings → click the calendar →
-**Integrate calendar** → copy **Secret address in iCal format**. Then:
+### Option 1 (recommended): Google Apps Script
+
+Works even when Google hides the "Secret address in iCal format"
+(Workspace accounts / shared calendars). It runs as your account and reads
+any calendar you can see.
+
+1. script.google.com → New project → paste `google-apps-script/Code.gs`.
+2. Set `TOKEN` to a long random password and fill the Warehouse Calendar ID.
+3. Run `testAccess` once and authorise; the log must say OK for both calendars.
+4. Deploy → New deployment → Web app → Execute as **Me**, Who has access **Anyone** → copy the `/exec` URL.
+5. `npx wrangler secret put CAL_SCRIPT_URL` → paste `https://script.google.com/macros/s/.../exec?token=YOUR_TOKEN`
+
+After editing the script: Deploy → Manage deployments → edit → Version: New version
+(keeps the same URL).
+
+### Option 2: secret iCal addresses
+
+Google Calendar → Settings → calendar → **Integrate calendar** →
+**Secret address in iCal format**:
 
 ```
 npx wrangler secret put CAL_WAREHOUSE      # Warehouse/Deliveries
 npx wrangler secret put CAL_LIVING_BRAY    # Living Bray
 ```
 
-For `wrangler dev`, put the same values in a `.dev.vars` file (do not commit it):
+If `CAL_SCRIPT_URL` exists it is used; otherwise the iCal secrets.
 
-```
-CAL_WAREHOUSE=https://calendar.google.com/calendar/ical/.../basic.ics
-CAL_LIVING_BRAY=https://calendar.google.com/calendar/ical/.../basic.ics
-```
+For `wrangler dev`, put the same values in a `.dev.vars` file (never commit it).
 
-To change names, colours or priority, edit `CALENDARS` in `src/calendar.js`.
+To change names, colours or priority, edit `CALENDARS` in `src/calendar.js`
+(iCal) or in `Code.gs` (Apps Script).
 
 ## Run locally
 
