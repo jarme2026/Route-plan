@@ -14,6 +14,7 @@
     --accent: #1f5fbf;
     --ok: #1e8a4c;
     --danger: #c0392b;
+    --warn-bg: #fff4e5;
   }
 
   * { box-sizing: border-box; }
@@ -27,9 +28,13 @@
 
   .hidden { display: none !important; }
 
-  /* ---------- NAME GATE + CARD OVERLAY ---------- */
+  /* admin-only / team-only pieces */
+  body.role-basic .admin-only { display: none !important; }
+  body.role-admin .basic-only { display: none !important; }
 
-  #gate, #card-modal {
+  /* ---------- OVERLAYS (name gate, event card, answers) ---------- */
+
+  #gate, .modal {
     position: fixed;
     inset: 0;
     display: flex;
@@ -52,7 +57,8 @@
   .gate-card h1 { margin: 0 0 6px; font-size: 22px; }
   .gate-card p { margin: 0 0 18px; color: var(--muted); }
 
-  .gate-card input {
+  .gate-card input[type=text],
+  .gate-card input[type=password] {
     width: 100%;
     font-size: 17px;
     padding: 10px 12px;
@@ -60,6 +66,19 @@
     border-radius: 8px;
     margin-bottom: 14px;
   }
+
+  .gate-card .check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 14px;
+    font-size: 15px;
+    cursor: pointer;
+  }
+
+  .gate-card .check input { width: 18px; height: 18px; }
+
+  .gate-error { color: var(--danger); font-size: 14px; margin: -6px 0 12px; }
 
   /* ---------- TOOLBAR ---------- */
 
@@ -76,8 +95,20 @@
     border-bottom: 1px solid #d5d8dd;
   }
 
-  .toolbar .user { font-weight: 600; margin-right: auto; }
-  .toolbar .user small { font-weight: 400; color: var(--muted); }
+  .toolbar .user { font-weight: 600; margin-right: auto; display: flex; align-items: center; gap: 6px; }
+
+  .role-badge {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    padding: 2px 8px;
+    border-radius: 99px;
+    background: #e8eefb;
+    color: var(--accent);
+  }
+
+  body.role-admin .role-badge { background: #fdeee7; color: #b3471c; }
 
   button, .btn {
     font: inherit;
@@ -87,6 +118,7 @@
     border: 1px solid #c4c8ce;
     background: #fff;
     cursor: pointer;
+    color: var(--ink);
   }
 
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -99,7 +131,7 @@
   #status.ok { color: var(--ok); }
   #status.err { color: var(--danger); }
 
-  /* ---------- SAVED LIST ---------- */
+  /* ---------- SHEET LIST ---------- */
 
   .panel {
     max-width: 820px;
@@ -122,13 +154,28 @@
     display: flex;
     gap: 8px;
     align-items: center;
-    padding: 6px 0;
+    padding: 8px 0;
     border-top: 1px solid #eee;
     font-size: 14px;
   }
 
-  #saved-list li span { flex: 1; }
+  #saved-list li span.info { flex: 1; min-width: 0; }
   #saved-list li small { color: var(--muted); }
+  #saved-list li.current { background: #f4f8ff; }
+
+  .pill {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 99px;
+    background: #eef0f3;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .pill.closed { background: #fdecea; color: var(--danger); }
+  .pill.done { background: #e7f5ec; color: var(--ok); }
 
   /* ---------- PAPER ---------- */
 
@@ -138,6 +185,21 @@
     margin: 12px auto 24px;
     padding: 22px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, .08);
+  }
+
+  .closed-banner {
+    background: #fdecea;
+    color: var(--danger);
+    font-weight: 600;
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+  }
+
+  .empty-state {
+    text-align: center;
+    color: var(--muted);
+    padding: 40px 16px;
   }
 
   .sheet { border: 2px solid var(--line); }
@@ -157,6 +219,8 @@
     margin-bottom: 4px;
   }
 
+  .ro-value { font-size: 18px; padding: 6px 0; border-bottom: 2px solid var(--line); min-height: 36px; }
+
   .date-row {
     display: flex;
     align-items: center;
@@ -175,6 +239,7 @@
     background: transparent;
     border-radius: 0;
     min-width: 0;
+    color: var(--ink);
   }
 
   select:focus, input[type=text]:focus {
@@ -182,6 +247,8 @@
     border-bottom-color: var(--accent);
     background: #f4f8ff;
   }
+
+  select:disabled, input:disabled { color: var(--ink); opacity: 1; }
 
   .wide { width: 100%; }
 
@@ -197,9 +264,11 @@
     border-left: 10px solid var(--route, transparent);
   }
 
-  .route-bar label { font-weight: 700; font-size: 17px; }
+  .route-bar label, .route-bar .label { font-weight: 700; font-size: 17px; margin: 0; }
 
   #route { font-weight: 700; min-width: 190px; }
+
+  #route-name { font-weight: 700; font-size: 17px; }
 
   .route-bar small { color: var(--muted); margin-left: auto; }
 
@@ -210,6 +279,7 @@
     background: var(--c, #999);
     flex: 0 0 auto;
     display: inline-block;
+    vertical-align: middle;
   }
 
   /* ---------- DELIVERIES ---------- */
@@ -235,8 +305,8 @@
 
   table.deliveries td { height: 60px; vertical-align: middle; }
 
-  col.c-card { width: 38%; }
-  col.c-pp { width: 27%; }
+  col.c-card { width: 40%; }
+  col.c-pp { width: 30%; }
 
   .pick { width: 100%; font-weight: 700; }
 
@@ -250,17 +320,18 @@
   .manual select { flex: 0 0 auto; font-weight: 700; }
   .manual input { flex: 1; width: 100%; }
 
+  .ro-ref { font-weight: 700; font-size: 15px; }
+
+  .refs-line { display: block; font-size: 13px; font-weight: 700; margin-top: 3px; }
+  .refs-line:empty { display: none; }
+
   .print-ref { display: none; font-weight: 700; }
 
-  .times {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    gap: 6px;
-  }
+  .dur { width: 100%; font-weight: 700; }
+  .dur.set { background: #eef8f1; }
 
-  .times .dash { font-weight: 700; font-size: 20px; }
-  .times select { width: 100%; }
+  .dur-by { display: block; font-size: 12px; color: var(--muted); margin-top: 3px; min-height: 14px; }
+  .dur-by.saved { color: var(--ok); }
 
   .m-label { display: none; }
 
@@ -292,6 +363,9 @@
 
   .no-event { font-size: 13px; color: var(--muted); font-style: italic; }
 
+  /* team view: only rows with a delivery */
+  body.role-basic table.deliveries tr.empty { display: none; }
+
   .sign {
     padding: 22px 14px 6px;
     display: grid;
@@ -302,9 +376,9 @@
 
   .sign input { width: 100%; }
 
-  /* ---------- CARD (modal) ---------- */
+  /* ---------- CARD / ANSWERS (modal boxes) ---------- */
 
-  .card-box {
+  .card-box, .answers-box {
     background: var(--paper);
     width: 100%;
     max-width: 500px;
@@ -316,10 +390,12 @@
     box-shadow: 0 10px 40px rgba(0, 0, 0, .3);
   }
 
+  .answers-box { max-width: 720px; border-top-color: var(--accent); }
+
   .card-top { display: flex; align-items: center; gap: 8px; }
   .card-top .chip { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); margin-right: auto; }
 
-  .cm-ref { font-size: 26px; font-weight: 700; margin: 8px 0 2px; }
+  .cm-ref { font-size: 22px; font-weight: 700; margin: 8px 0 2px; }
   .cm-when { color: var(--muted); font-size: 15px; }
   .card-box h2 { font-size: 19px; margin: 12px 0; }
 
@@ -328,18 +404,30 @@
   .cm-desc { white-space: pre-wrap; font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; }
   .card-box a { color: var(--accent); }
 
+  .answers-box h2 { font-size: 20px; margin: 0 auto 0 0; }
+  .answers-sub { color: var(--muted); font-size: 14px; margin: 4px 0 12px; }
+
+  .ans-item { border-top: 1px solid #eee; padding: 10px 0; }
+  .ans-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .ans-head strong { flex: 1; min-width: 200px; }
+  .ans-final { font-weight: 700; white-space: nowrap; }
+  .ans-final.none { color: var(--danger); font-weight: 400; }
+  .ans-hist { list-style: none; margin: 6px 0 0; padding: 0 0 0 12px; border-left: 3px solid #e3e5e9; font-size: 13px; color: var(--muted); }
+  .ans-hist li { padding: 1px 0; }
+
   /* ---------- MOBILE: one block per delivery ---------- */
 
   @media (max-width: 640px) {
 
     .toolbar { padding: 8px 10px; gap: 6px; }
-    .toolbar .user { flex: 1 0 100%; display: flex; align-items: center; gap: 6px; }
+    .toolbar .user { flex: 1 0 100%; }
     .toolbar #status { order: 5; flex: 1 0 100%; min-width: 0; }
-    .toolbar > button { flex: 1; }
+    .toolbar > button { flex: 1; padding: 8px 6px; }
 
     .panel { padding: 0 8px; }
 
     .paper { padding: 0; margin: 8px 8px 24px; }
+    .closed-banner { margin: 8px; }
 
     .sheet { border-width: 0; }
 
@@ -362,7 +450,7 @@
     table.deliveries tr {
       counter-increment: row;
       display: grid;
-      grid-template-columns: 30px 1fr;
+      grid-template-columns: 30px minmax(0, 1fr);
       gap: 8px 10px;
       padding: 12px;
       border-bottom: 1px solid #d5d8dd;
@@ -388,6 +476,7 @@
       height: auto;
       padding: 0;
       grid-column: 2;
+      min-width: 0;
     }
 
     td.c-pp { order: 1; }
@@ -398,18 +487,17 @@
 
     .m-label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 2px; }
 
-    .times { grid-template-columns: 1fr 1fr; gap: 8px; }
-    .times .dash { display: none; }
+    .dur { font-size: 17px; padding: 8px; border: 1px solid #c4c8ce; border-radius: 8px; }
 
     .card-link { font-size: 14px; padding: 6px 10px; }
 
-    /* only filled rows + the next empty one */
-    table.deliveries tr.empty:not(.next) { display: none; }
+    /* admin: only filled rows + the next empty one */
+    body.role-admin table.deliveries tr.empty:not(.next) { display: none; }
 
     .sign { padding: 16px 12px; }
 
-    #card-modal { align-items: flex-end; padding: 0; }
-    .card-box { max-width: none; border-radius: 14px 14px 0 0; max-height: 85vh; }
+    .modal { align-items: flex-end; padding: 0; }
+    .card-box, .answers-box { max-width: none; border-radius: 14px 14px 0 0; max-height: 88vh; }
   }
 
   /* ---------- PRINT (A4, like the paper form) ---------- */
@@ -419,7 +507,7 @@
 
     body { background: #fff; }
 
-    .toolbar, .panel, #gate, #card-modal, .route-bar small, #route-refresh, #route-fill { display: none !important; }
+    .toolbar, .panel, #gate, .modal, .route-bar small, .route-bar button, .closed-banner { display: none !important; }
 
     .paper { box-shadow: none; margin: 0; padding: 0; max-width: none; }
 
@@ -433,8 +521,9 @@
 
     .head select, .sign input { border-bottom-color: var(--line); }
 
-    .pick, .manual { display: none !important; }
+    .pick, .manual, .refs-line, .dur-by { display: none !important; }
     .print-ref { display: inline; }
+    .dur.set { background: none; }
 
     .card-link { border: 0; background: none; padding: 0; }
     .no-event { display: none; }
@@ -443,24 +532,27 @@
   }
 </style>
 </head>
-<body>
+<body class="role-basic">
 
 <!-- ================= NAME GATE ================= -->
-<div id="gate">
-  <form class="gate-card" id="gate-form">
+<form id="gate">
+  <div class="gate-card">
     <h1>route plan</h1>
     <p>Please enter your name to continue.</p>
     <input id="gate-name" type="text" autocomplete="name" placeholder="Your name" maxlength="60" required>
-    <button class="primary wide" type="submit">Enter</button>
-  </form>
-</div>
+    <label class="check"><input type="checkbox" id="gate-admin"> I'm the admin</label>
+    <input id="gate-pass" type="password" class="hidden" placeholder="Admin password" autocomplete="current-password">
+    <div class="gate-error hidden" id="gate-error"></div>
+    <button class="primary wide" type="submit" id="gate-enter">Enter</button>
+  </div>
+</form>
 
 <!-- ================= EVENT CARD ================= -->
-<div id="card-modal" class="hidden" role="dialog" aria-modal="true" aria-labelledby="cm-title">
+<div id="card-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="cm-title">
   <div class="card-box" id="cm-box">
     <div class="card-top">
       <span class="chip"><span class="dot"></span><span id="cm-color"></span></span>
-      <button type="button" class="small" id="cm-close" aria-label="Close">Close</button>
+      <button type="button" class="small" data-close aria-label="Close">Close</button>
     </div>
     <div class="cm-ref" id="cm-ref"></div>
     <div class="cm-when" id="cm-when"></div>
@@ -477,56 +569,82 @@
   </div>
 </div>
 
+<!-- ================= ANSWERS (admin) ================= -->
+<div id="answers-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="ans-title">
+  <div class="answers-box">
+    <div class="card-top">
+      <h2 id="ans-title">Delivery duration answers</h2>
+      <button type="button" class="small" id="ans-csv">Download CSV</button>
+      <button type="button" class="small" data-close aria-label="Close">Close</button>
+    </div>
+    <div class="answers-sub" id="ans-sub"></div>
+    <div id="ans-body"></div>
+  </div>
+</div>
+
 <!-- ================= TOOLBAR ================= -->
 <div class="toolbar">
   <div class="user">
     <span id="who"></span>
+    <span class="role-badge" id="role-badge">Team</span>
     <button class="link" id="change-user" type="button">change</button>
   </div>
   <span id="status"></span>
-  <button type="button" id="btn-new">New</button>
-  <button type="button" class="primary" id="btn-save">Save</button>
+  <button type="button" class="admin-only" id="btn-new">New</button>
+  <button type="button" class="admin-only primary" id="btn-save">Save</button>
+  <button type="button" class="admin-only" id="btn-answers">Answers</button>
+  <button type="button" class="admin-only" id="btn-close">Close day</button>
+  <button type="button" class="basic-only" id="btn-reload">Refresh</button>
   <button type="button" id="btn-print">Print</button>
 </div>
 
-<!-- ================= SAVED SHEETS ================= -->
+<!-- ================= SHEETS ================= -->
 <div class="panel" id="saved">
-  <details>
-    <summary>Saved sheets (<span id="saved-count">0</span>)</summary>
+  <details id="saved-box">
+    <summary>Sheets (<span id="saved-count">0</span>)</summary>
     <ul id="saved-list"></ul>
   </details>
 </div>
 
 <!-- ================= SHEET ================= -->
 <main class="paper">
+
+  <div class="closed-banner hidden" id="closed-banner"></div>
+
+  <div class="empty-state hidden" id="empty-state">Open a sheet from the list above.</div>
+
+  <div id="sheet-wrap">
   <div class="sheet">
 
     <div class="head">
 
       <div class="field">
         <span class="label">Date:</span>
-        <div class="date-row">
+        <div class="date-row admin-only">
           <select id="date-day" aria-label="Day of month"></select>
           <span class="sep">/</span>
           <select id="date-month" aria-label="Month"></select>
           <span class="sep">/</span>
           <select id="date-year" aria-label="Year"></select>
         </div>
+        <div class="ro-value basic-only" id="ro-date"></div>
       </div>
 
       <div class="field">
         <label for="weekday">Day:</label>
-        <select id="weekday" class="wide"></select>
+        <select id="weekday" class="wide admin-only"></select>
+        <div class="ro-value basic-only" id="ro-day"></div>
       </div>
 
     </div>
 
     <div class="route-bar" id="route-bar">
-      <label for="route">Route:</label>
-      <select id="route"><option value="">Choose the date first</option></select>
-      <button type="button" class="small" id="route-fill" title="Put every delivery of this route on the sheet">Fill all</button>
-      <button type="button" class="small" id="route-refresh" title="Reload the calendar">Refresh</button>
-      <small id="cal-synced"></small>
+      <span class="label">Route:</span>
+      <select id="route" class="admin-only" aria-label="Route"><option value="">Choose the date first</option></select>
+      <span id="route-name" class="basic-only"></span>
+      <button type="button" class="small admin-only" id="route-fill" title="Put every event of this route on the sheet">Fill all</button>
+      <button type="button" class="small admin-only" id="route-refresh" title="Reload the calendar">Refresh</button>
+      <small id="cal-synced" class="admin-only"></small>
     </div>
 
     <table class="deliveries">
@@ -537,7 +655,7 @@
         <tr>
           <th>Delivery</th>
           <th>PP / OS</th>
-          <th>Time in &nbsp;-&nbsp; Time out</th>
+          <th>Delivery duration</th>
         </tr>
       </thead>
       <tbody id="rows"></tbody>
@@ -555,6 +673,8 @@
       <input id="sign-in" type="text">
     </div>
   </div>
+  </div>
+
 </main>
 
 <script>
@@ -605,6 +725,7 @@
   const MANUAL = '__manual';
 
   const NAME_KEY = 'route-plan:name';
+  const TOKEN_KEY = 'route-plan:admin-token';
 
   const $ = id => document.getElementById(id);
 
@@ -630,6 +751,15 @@
     return parts.join(' ');
   }
 
+  function shortTime(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const today = new Date().toDateString() === d.toDateString();
+    return today
+      ? d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+      : d.toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
+  }
+
   function fillSelect(select, options, placeholder) {
     select.innerHTML = '';
     const empty = document.createElement('option');
@@ -649,7 +779,10 @@
   }
 
   function safeSet(key, value) {
-    try { localStorage.setItem(key, value); } catch {}
+    try {
+      if (value) localStorage.setItem(key, value);
+      else localStorage.removeItem(key);
+    } catch {}
   }
 
   function newId() {
@@ -709,25 +842,176 @@
     return ev.allDay ? 'All day' : `${ev.start}–${ev.end}`;
   }
 
-  // Text for the PP / OS dropdown: "PP 104522 · 08:30 Murphy - sofa"
+  // Text for the dropdown: "10:00 · D04 pp26159 os49481 (4876) BALDue"
   function optionLabel(ev) {
-    const rest = (ev.title || '')
-      .replace(/\b(PP|OS)\s*[-:#.]?\s*\d{3,}/i, '')
-      .replace(/^[\s\-–:,]+/, '')
-      .trim();
     const time = ev.allDay ? 'All day' : ev.start;
-    if (!ev.number) {
-      const t = (ev.title || '').trim();
-      return `${time} · ${t.length > 34 ? t.slice(0, 33) + '…' : t}`;
-    }
-    const short = rest.length > 28 ? rest.slice(0, 27) + '…' : rest;
-    return `${ev.kind} ${ev.number} · ${time}${short ? ' ' + short : ''}`;
+    const t = (ev.title || '').replace(/\s+/g, ' ').trim();
+    return `${time} · ${t.length > 44 ? t.slice(0, 43) + '…' : t}`;
   }
 
+  // Every PP / OS in the title + description: "pp26347 pp26352 os49917"
+  function parseRefs(text) {
+    const refs = [];
+    const re = /\b(PP|OS)\s*[-:#.]?\s*(\d{3,})/gi;
+    let m;
+    while ((m = re.exec(text || ''))) {
+      const ref = { kind: m[1].toUpperCase(), number: m[2] };
+      if (!refs.some(r => r.kind === ref.kind && r.number === ref.number)) refs.push(ref);
+    }
+    return refs;
+  }
+
+  // "PP 26347, 26352 · OS 49917, 49976"
+  function refsText(refs) {
+    return ['PP', 'OS']
+      .map(k => {
+        const nums = (refs || []).filter(r => r.kind === k).map(r => r.number);
+        return nums.length ? `${k} ${nums.join(', ')}` : '';
+      })
+      .filter(Boolean)
+      .join(' · ');
+  }
+
+  // Add refs (all PP / OS) and main kind / number to a calendar event
+  function prepareEvent(ev) {
+    const refs = parseRefs((ev.title || '') + '\n' + descriptionText(ev.description));
+    const first = refs[0];
+    return {
+      ...ev,
+      refs,
+      kind: first ? first.kind : (ev.kind || ''),
+      number: first ? first.number : (ev.number || '')
+    };
+  }
 
   // Unique key of an event: its PP / OS, or time + title when it has none
   function evKey(ev) {
     return ev.number ? ev.kind + ':' + ev.number : 'T:' + (ev.start || '') + '|' + (ev.title || '');
+  }
+
+  // Text of a sheet row: PP / OS list, or the event title
+  function rowRefText(row) {
+    if (row.event && row.event.refs && row.event.refs.length) return refsText(row.event.refs);
+    if (row.number) return `${row.kind} ${row.number}`;
+    return row.event ? '—' : '';
+  }
+
+
+  // =========================================
+  // STATE
+  // =========================================
+
+  let userName = safeGet(NAME_KEY);
+  let adminToken = safeGet(TOKEN_KEY);
+  let isAdmin = false;
+
+  let currentId = newId();
+  let sheetSaved = false;          // current sheet exists on the server
+  let sheetStatus = 'open';        // open | closed
+  let sheetInfo = {};              // closedBy / closedAt / updatedAt
+  let savedKeys = new Set();       // delivery keys as last saved (durations need them)
+
+  let calDate = '';
+  let calColor = '';               // default colour of the calendar
+  let syncedAt = null;
+  let dayEvents = [];              // events of the sheet date (already filtered)
+  let routes = [];                 // [{ name, hex, events: [...] }]
+  let currentRoute = '';           // route name (colour)
+  let routeHex = '';
+
+  let rowEvents = new Array(ROWS).fill(null);    // event linked to each row
+  let manualMode = new Array(ROWS).fill(false);  // row typed by hand
+  let rowDur = new Array(ROWS).fill(null);       // { duration, durationBy, durationAt }
+  let justSaved = new Array(ROWS).fill(false);
+
+  let sheetList = [];
+
+
+  // Events that never show: "1 van", "2 vans", no title, two-letter initials
+  function isIgnored(ev) {
+    const t = (ev.title || '').trim();
+    if (!t || /^\(no title\)$/i.test(t)) return true;
+    if (/^\d+\s*vans?$/i.test(t)) return true;
+    if (/^\p{L}\.?\s*\p{L}\.?$/u.test(t)) return true;
+    return false;
+  }
+
+
+  function colorOf(ev) {
+    if (EVENT_COLORS[ev.colorId]) {
+      const [name, hex] = EVENT_COLORS[ev.colorId];
+      return { name, hex };
+    }
+    const hex = safeHex(calColor);
+    return { name: hueName(hex), hex };
+  }
+
+
+  function sheetIsoDate() {
+
+    const d = $('date-day').value;
+    const m = $('date-month').value;
+    const y = $('date-year').value;
+
+    if (!d || !m || !y) return '';
+
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
+  }
+
+
+  function todayIso() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+
+  function listIso(s) {
+    const d = s.date || {};
+    return d.year ? `${d.year}-${String(d.month).padStart(2, '0')}-${String(d.day).padStart(2, '0')}` : '';
+  }
+
+
+  function rowKey(i) {
+    const num = field(i, 'number').value.trim();
+    if (num) return field(i, 'kind').value + ':' + num;
+    const ev = rowEvents[i];
+    return (ev && !ev.number) ? evKey(ev) : '';
+  }
+
+
+  function snapshot(ev) {
+    const c = colorOf(ev);
+    return {
+      date: ev.date, start: ev.start, end: ev.end, allDay: !!ev.allDay,
+      title: ev.title, location: ev.location, description: ev.description || '',
+      kind: ev.kind, number: ev.number, refs: ev.refs || [], colorName: c.name, colorHex: c.hex
+    };
+  }
+
+
+  function buildRoutes() {
+
+    const map = new Map();
+
+    for (const ev of dayEvents) {
+      const c = colorOf(ev);
+      if (!map.has(c.name)) map.set(c.name, { ...c, events: [] });
+      map.get(c.name).events.push(ev);
+    }
+
+    const rank = r => {
+      const i = ROUTE_ORDER.indexOf(r.name);
+      return i === -1 ? ROUTE_ORDER.length : i;
+    };
+
+    routes = [...map.values()].sort((a, b) => rank(a) - rank(b) || b.events.length - a.events.length);
+
+  }
+
+
+  function findEvent(kind, number) {
+    return dayEvents.find(ev => ev.number === number && ev.kind === kind);
   }
 
 
@@ -800,27 +1084,25 @@
         <td class="c-card" id="card-${i}"></td>
         <td class="c-pp">
           <span class="m-label">PP / OS</span>
-          <select class="pick" data-row="${i}" data-field="pick" aria-label="PP / OS"></select>
-          <div class="manual hidden" id="manual-${i}">
+          <select class="pick admin-only" data-row="${i}" data-field="pick" aria-label="PP / OS"></select>
+          <div class="manual hidden admin-only" id="manual-${i}">
             <select data-row="${i}" data-field="kind" aria-label="PP or OS">
               <option value="PP">PP</option>
               <option value="OS">OS</option>
             </select>
             <input type="text" data-row="${i}" data-field="number" inputmode="numeric" placeholder="Number" aria-label="PP / OS number">
           </div>
+          <span class="refs-line admin-only" id="refs-${i}"></span>
+          <span class="ro-ref basic-only" id="ro-ref-${i}"></span>
           <span class="print-ref" id="print-ref-${i}"></span>
         </td>
         <td class="c-times">
-          <span class="m-label">Time in &nbsp;/&nbsp; Time out</span>
-          <div class="times">
-            <select data-row="${i}" data-field="timeIn" aria-label="Time in"></select>
-            <span class="dash">-</span>
-            <select data-row="${i}" data-field="timeOut" aria-label="Time out"></select>
-          </div>
+          <span class="m-label">Delivery duration</span>
+          <select class="dur" data-row="${i}" data-field="duration" aria-label="Delivery duration"></select>
+          <span class="dur-by" id="dur-by-${i}"></span>
         </td>`;
 
-      fillSelect(tr.querySelector('[data-field=timeIn]'), durationOptions, '—');
-      fillSelect(tr.querySelector('[data-field=timeOut]'), durationOptions, '—');
+      fillSelect(tr.querySelector('[data-field=duration]'), durationOptions, '—');
 
       tbody.appendChild(tr);
 
@@ -830,99 +1112,61 @@
 
 
   // =========================================
-  // STATE
+  // ROLE
   // =========================================
 
-  let calDate = '';
-  let calColor = '';                 // default colour of the calendar
-  let syncedAt = null;
-  let dayEvents = [];                // events of the sheet date (already filtered)
-  let routes = [];                   // [{ name, hex, events: [...] }]
-  let currentRoute = '';             // route name (colour)
-  let routeHex = '';
+  function applyRole() {
 
-  let rowEvents = new Array(ROWS).fill(null);    // event linked to each row
-  let manualMode = new Array(ROWS).fill(false);  // row typed by hand
+    document.body.classList.toggle('role-admin', isAdmin);
+    document.body.classList.toggle('role-basic', !isAdmin);
 
+    $('role-badge').textContent = isAdmin ? 'Admin' : 'Team';
 
-  // Events that never show: "1 van", "2 vans", no title, two-letter initials
-  function isIgnored(ev) {
-    const t = (ev.title || '').trim();
-    if (!t || /^\(no title\)$/i.test(t)) return true;
-    if (/^\d+\s*vans?$/i.test(t)) return true;
-    if (/^\p{L}\.?\s*\p{L}\.?$/u.test(t)) return true;
-    return false;
-  }
-
-
-  function colorOf(ev) {
-    if (EVENT_COLORS[ev.colorId]) {
-      const [name, hex] = EVENT_COLORS[ev.colorId];
-      return { name, hex };
-    }
-    const hex = safeHex(calColor);
-    return { name: hueName(hex), hex };
-  }
-
-
-  function sheetIsoDate() {
-
-    const d = $('date-day').value;
-    const m = $('date-month').value;
-    const y = $('date-year').value;
-
-    if (!d || !m || !y) return '';
-
-    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    applyLock();
 
   }
 
 
-  function rowKey(i) {
-    const num = field(i, 'number').value.trim();
-    if (num) return field(i, 'kind').value + ':' + num;
-    const ev = rowEvents[i];
-    return (ev && !ev.number) ? evKey(ev) : '';
-  }
+  // what can be edited right now
+  function applyLock() {
 
+    const closed = sheetStatus === 'closed';
+    const adminEdit = isAdmin && !closed;
 
-  function snapshot(ev) {
-    const c = colorOf(ev);
-    return {
-      date: ev.date, start: ev.start, end: ev.end, allDay: !!ev.allDay,
-      title: ev.title, location: ev.location, description: ev.description || '',
-      kind: ev.kind, number: ev.number, colorName: c.name, colorHex: c.hex
-    };
-  }
-
-
-  function buildRoutes() {
-
-    const map = new Map();
-
-    for (const ev of dayEvents) {
-      const c = colorOf(ev);
-      if (!map.has(c.name)) map.set(c.name, { ...c, events: [] });
-      map.get(c.name).events.push(ev);
+    for (const id of ['date-day', 'date-month', 'date-year', 'weekday', 'route', 'sign-out', 'sign-in']) {
+      $(id).disabled = !adminEdit;
     }
 
-    const rank = r => {
-      const i = ROUTE_ORDER.indexOf(r.name);
-      return i === -1 ? ROUTE_ORDER.length : i;
-    };
+    $('route-fill').disabled = !adminEdit || !routes.some(r => r.name === currentRoute);
+    $('route-refresh').disabled = !adminEdit;
+    $('btn-save').disabled = closed;
 
-    routes = [...map.values()].sort((a, b) => rank(a) - rank(b) || b.events.length - a.events.length);
+    document.querySelectorAll('[data-field=pick], [data-field=kind], [data-field=number]')
+      .forEach(el => { el.disabled = !adminEdit; });
 
-  }
+    document.querySelectorAll('[data-field=duration]')
+      .forEach(el => { el.disabled = closed || !rowKey(Number(el.dataset.row)); });
 
+    $('btn-close').textContent = closed ? 'Reopen day' : 'Close day';
+    $('btn-close').disabled = !sheetSaved;
+    $('btn-answers').disabled = !sheetSaved;
 
-  function findEvent(kind, number) {
-    return dayEvents.find(ev => ev.number === number && ev.kind === kind);
+    const banner = $('closed-banner');
+    banner.classList.toggle('hidden', !closed);
+    banner.textContent = closed
+      ? `Day closed by ${sheetInfo.closedBy || '?'} · ${shortTime(sheetInfo.closedAt)} – durations can't be changed`
+      : '';
+
+    // team member without a sheet opened
+    const nothing = !isAdmin && !sheetSaved;
+    $('sheet-wrap').classList.toggle('hidden', nothing);
+    $('empty-state').classList.toggle('hidden', !nothing);
+
   }
 
 
   // =========================================
-  // ROUTE DROPDOWN
+  // ROUTE DROPDOWN (admin)
   // =========================================
 
   function renderRoute() {
@@ -948,7 +1192,7 @@
     if (r) routeHex = r.hex;
     $('route-bar').style.setProperty('--route', currentRoute ? safeHex(routeHex) : 'transparent');
 
-    $('route-fill').disabled = !r;
+    $('route-name').textContent = currentRoute || '—';
 
     $('cal-synced').textContent = !calDate ? '' : syncedAt
       ? 'Calendar synced ' + new Date(syncedAt).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })
@@ -958,7 +1202,7 @@
 
 
   // =========================================
-  // ROWS: PP / OS dropdown + card + mobile state
+  // ROWS
   // =========================================
 
   function renderPick(i, used) {
@@ -999,8 +1243,18 @@
 
     $('manual-' + i).classList.toggle('hidden', !manual);
 
+  }
+
+
+  function renderRefs(i) {
+
     const num = field(i, 'number').value.trim();
-    $('print-ref-' + i).textContent = num ? field(i, 'kind').value + ' ' + num : '';
+    const linked = rowEvents[i];
+    const text = rowRefText({ kind: field(i, 'kind').value, number: num, event: linked });
+
+    $('refs-' + i).textContent = (linked && linked.refs && linked.refs.length > 1) ? refsText(linked.refs) : '';
+    $('ro-ref-' + i).textContent = text;
+    $('print-ref-' + i).textContent = text === '—' ? '' : text;
 
   }
 
@@ -1027,7 +1281,34 @@
   }
 
 
-  // mobile shows only the filled rows + the next empty one
+  function renderDuration(i) {
+
+    const sel = field(i, 'duration');
+    const d = rowDur[i];
+    const key = rowKey(i);
+
+    sel.value = d && d.duration ? String(d.duration) : '';
+    sel.classList.toggle('set', !!(d && d.duration));
+
+    const by = $('dur-by-' + i);
+    by.classList.toggle('saved', justSaved[i]);
+
+    if (!key) {
+      by.textContent = '';
+    } else if (justSaved[i]) {
+      by.textContent = '✓ Saved';
+    } else if (d && d.durationBy) {
+      by.textContent = `${d.duration ? '' : 'Cleared · '}${d.durationBy} · ${shortTime(d.durationAt)}`;
+    } else if (isAdmin && !savedKeys.has(key)) {
+      by.textContent = 'Save the sheet to allow durations';
+    } else {
+      by.textContent = '';
+    }
+
+  }
+
+
+  // mobile (admin) shows only the filled rows + the next empty one; team sees filled rows
   function markRows() {
 
     let nextSet = false;
@@ -1052,11 +1333,14 @@
     }
 
     for (let i = 0; i < ROWS; i++) {
-      renderPick(i, used);
+      if (isAdmin) renderPick(i, used);
+      renderRefs(i);
       renderCardCell(i);
+      renderDuration(i);
     }
 
     markRows();
+    applyLock();
 
   }
 
@@ -1090,9 +1374,18 @@
   }
 
 
+  // row content changed (admin): the old duration no longer belongs to it
+  function resetRowDuration(i) {
+    rowDur[i] = null;
+    justSaved[i] = false;
+  }
+
+
   function onPick(i) {
 
     const value = field(i, 'pick').value;
+
+    resetRowDuration(i);
 
     if (value === MANUAL) {
       manualMode[i] = true;
@@ -1153,6 +1446,7 @@
 
       if (row === -1) { noRoom++; continue; }
 
+      resetRowDuration(row);
       field(row, 'kind').value = ev.kind || 'PP';
       field(row, 'number').value = ev.number || '';
       if (ev.number) linkRow(row);
@@ -1173,6 +1467,60 @@
 
 
   // =========================================
+  // DELIVERY DURATION (everyone)
+  // =========================================
+
+  async function onDuration(i) {
+
+    const sel = field(i, 'duration');
+    const key = rowKey(i);
+    const value = sel.value;
+
+    if (!sheetSaved || !savedKeys.has(key)) {
+      renderDuration(i);
+      setStatus('Save the sheet first, then choose the duration', 'err');
+      return;
+    }
+
+    sel.disabled = true;
+    setStatus('Saving duration…');
+
+    try {
+
+      const res = await api(`/api/sheets/${currentId}/duration`, {
+        method: 'POST',
+        body: JSON.stringify({ key, minutes: value === '' ? null : Number(value) })
+      });
+
+      rowDur[i] = {
+        duration: res.row.duration,
+        durationBy: res.row.durationBy,
+        durationAt: res.row.durationAt
+      };
+
+      // bring in any change made by the others since the page was opened
+      await reloadCurrent(true);
+
+      justSaved[i] = true;
+      setTimeout(() => { justSaved[i] = false; renderDuration(i); }, 4000);
+
+      setStatus('Duration saved ' + new Date().toLocaleTimeString('en-GB'), 'ok');
+
+    } catch (err) {
+
+      setStatus('Duration not saved: ' + err.message, 'err');
+      if (/closed/i.test(err.message)) reloadCurrent(true);
+
+    }
+
+    sel.disabled = sheetStatus === 'closed';
+    renderDuration(i);
+    loadList();
+
+  }
+
+
+  // =========================================
   // CARD (modal)
   // =========================================
 
@@ -1188,7 +1536,9 @@
 
     $('cm-box').style.setProperty('--c', safeHex(ev.colorHex));
     $('cm-color').textContent = ev.colorName || '';
-    $('cm-ref').textContent = ev.number ? `${ev.kind} ${ev.number}` : 'No PP / OS';
+    $('cm-ref').textContent =
+      (ev.refs && ev.refs.length) ? refsText(ev.refs)
+      : ev.number ? `${ev.kind} ${ev.number}` : 'No PP / OS';
     $('cm-when').textContent = [dateText, timeLabel(ev)].filter(Boolean).join(' · ');
     $('cm-title').textContent = ev.title || '';
 
@@ -1201,21 +1551,126 @@
     $('cm-desc').innerHTML = linkify(escapeHtml(desc));
 
     $('card-modal').classList.remove('hidden');
-    $('cm-close').focus();
 
   }
 
 
-  function closeCard() {
-    $('card-modal').classList.add('hidden');
+  function closeModals() {
+    document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
   }
 
 
   // =========================================
-  // CALENDAR LOAD
+  // ANSWERS (admin)
+  // =========================================
+
+  let answersCache = [];
+
+  async function openAnswers() {
+
+    if (!sheetSaved) return;
+
+    try {
+
+      await reloadCurrent(true);   // latest durations from everybody
+      answersCache = await api(`/api/sheets/${currentId}/responses`);
+
+    } catch (err) {
+
+      setStatus('Could not load answers: ' + err.message, 'err');
+      return;
+
+    }
+
+    const rows = [];
+
+    for (let i = 0; i < ROWS; i++) {
+      const key = rowKey(i);
+      if (!key) continue;
+      rows.push({ i, key });
+    }
+
+    const d = sheetIsoDate();
+    const answered = rows.filter(r => rowDur[r.i] && rowDur[r.i].duration).length;
+
+    $('ans-sub').textContent =
+      `${d ? d.split('-').reverse().join('/') : ''} · ${currentRoute || 'no route'} · ` +
+      `${answered} of ${rows.length} deliveries with duration · ${answersCache.length} answer${answersCache.length === 1 ? '' : 's'}` +
+      (sheetStatus === 'closed' ? ` · closed by ${sheetInfo.closedBy}` : ' · day still open');
+
+    $('ans-body').innerHTML = rows.map(({ i, key }) => {
+
+      const ev = rowEvents[i];
+      const title = ev ? `${timeLabel(ev)} · ${ev.title}` : rowRefText({ kind: field(i, 'kind').value, number: field(i, 'number').value.trim(), event: null });
+      const dur = rowDur[i];
+      const hist = answersCache.filter(a => a.key === key);
+
+      return `
+        <div class="ans-item">
+          <div class="ans-head">
+            <strong>${escapeHtml(title)}</strong>
+            ${dur && dur.duration
+              ? `<span class="ans-final">${escapeHtml(durationLabel(dur.duration))}</span>`
+              : '<span class="ans-final none">No duration</span>'}
+          </div>
+          ${hist.length ? `<ul class="ans-hist">${hist.map(a => `
+            <li>${escapeHtml(shortTime(a.at))} · ${escapeHtml(a.name)}${a.admin ? ' (admin)' : ''} → ${a.minutes ? escapeHtml(durationLabel(a.minutes)) : 'cleared'}</li>`).join('')}
+          </ul>` : ''}
+        </div>`;
+
+    }).join('') || '<p class="answers-sub">No deliveries on this sheet.</p>';
+
+    $('answers-modal').classList.remove('hidden');
+
+  }
+
+
+  function downloadCsv() {
+
+    const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const date = sheetIsoDate();
+
+    const lines = [['Date', 'Route', 'Delivery', 'PP / OS', 'Final duration (min)', 'Answer by', 'Answer (min)', 'Answered at'].map(q).join(',')];
+
+    for (let i = 0; i < ROWS; i++) {
+
+      const key = rowKey(i);
+      if (!key) continue;
+
+      const ev = rowEvents[i];
+      const ref = rowRefText({ kind: field(i, 'kind').value, number: field(i, 'number').value.trim(), event: ev });
+      const title = ev ? ev.title : '';
+      const final = rowDur[i] && rowDur[i].duration ? rowDur[i].duration : '';
+      const hist = answersCache.filter(a => a.key === key);
+
+      if (!hist.length) {
+        lines.push([date, currentRoute, title, ref, final, '', '', ''].map(q).join(','));
+      }
+
+      for (const a of hist) {
+        lines.push([date, currentRoute, title, ref, final, a.name, a.minutes ?? '', new Date(a.at).toLocaleString('en-GB')].map(q).join(','));
+      }
+
+    }
+
+    const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `durations-${date || 'sheet'}-${(currentRoute || 'route').toLowerCase().replace(/\s+/g, '-')}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+
+  }
+
+
+  // =========================================
+  // CALENDAR LOAD (admin)
   // =========================================
 
   async function loadCalendar() {
+
+    if (!isAdmin) return;
 
     calDate = sheetIsoDate();
 
@@ -1238,7 +1693,7 @@
 
       calColor = data.calendarColor || '';
       syncedAt = data.syncedAt || null;
-      dayEvents = (data.events || []).filter(ev => !isIgnored(ev));
+      dayEvents = (data.events || []).filter(ev => !isIgnored(ev)).map(prepareEvent);
 
       buildRoutes();
 
@@ -1248,7 +1703,10 @@
         if (linked && routes.some(r => r.name === linked.colorName)) currentRoute = linked.colorName;
       }
 
-      for (let i = 0; i < ROWS; i++) linkRow(i);
+      // closed sheets keep exactly what was saved
+      if (sheetStatus !== 'closed') {
+        for (let i = 0; i < ROWS; i++) linkRow(i);
+      }
 
       renderRoute();
       renderRows();
@@ -1266,18 +1724,15 @@
   // READ / WRITE FORM
   // =========================================
 
-  let currentId = newId();
-
   function readForm() {
 
     const rows = [];
 
     for (let i = 0; i < ROWS; i++) {
       rows.push({
+        key: rowKey(i),
         kind: field(i, 'kind').value,
         number: field(i, 'number').value.trim(),
-        timeIn: field(i, 'timeIn').value,
-        timeOut: field(i, 'timeOut').value,
         event: rowEvents[i]
       });
     }
@@ -1315,25 +1770,58 @@
 
     $('weekday').value = sheet.day || '';
 
+    $('ro-date').textContent = date.text || '—';
+    $('ro-day').textContent = sheet.day || '—';
+
     currentRoute = sheet.route || '';
     routeHex = sheet.routeHex || '';
 
+    sheetStatus = sheet.status || 'open';
+    sheetInfo = { closedBy: sheet.closedBy, closedAt: sheet.closedAt, updatedAt: sheet.updatedAt };
+
     const rows = sheet.rows || [];
+
+    savedKeys = new Set();
 
     for (let i = 0; i < ROWS; i++) {
       const row = rows[i] || {};
       field(i, 'kind').value = row.kind || 'PP';
       field(i, 'number').value = row.number || '';
-      field(i, 'timeIn').value = row.timeIn || '';
-      field(i, 'timeOut').value = row.timeOut || '';
       rowEvents[i] = row.event || null;
       manualMode[i] = !!row.number && !row.event;
+      rowDur[i] = row.duration || row.durationBy
+        ? { duration: row.duration, durationBy: row.durationBy, durationAt: row.durationAt }
+        : null;
+      justSaved[i] = false;
+      if (row.key) savedKeys.add(row.key);
     }
 
     $('sign-out').value = sheet.signOut || '';
     $('sign-in').value = sheet.signIn || '';
 
     renderRoute();
+    renderRows();
+    renderList();
+
+  }
+
+
+  // Only durations / status from the server (keeps the admin's unsaved edits)
+  function mergeDurations(sheet) {
+
+    sheetStatus = sheet.status || 'open';
+    sheetInfo = { closedBy: sheet.closedBy, closedAt: sheet.closedAt, updatedAt: sheet.updatedAt };
+
+    const byKey = {};
+    for (const r of (sheet.rows || [])) if (r.key) byKey[r.key] = r;
+
+    for (let i = 0; i < ROWS; i++) {
+      const r = byKey[rowKey(i)];
+      if (r && (r.duration || r.durationBy)) {
+        rowDur[i] = { duration: r.duration, durationBy: r.durationBy, durationAt: r.durationAt };
+      }
+    }
+
     renderRows();
 
   }
@@ -1343,18 +1831,17 @@
   // API
   // =========================================
 
-  let userName = safeGet(NAME_KEY);
-
   async function api(path, options = {}) {
 
-    const res = await fetch(path, {
-      ...options,
-      headers: {
-        'content-type': 'application/json',
-        'x-user-name': encodeURIComponent(userName),
-        ...(options.headers || {})
-      }
-    });
+    const headers = {
+      'content-type': 'application/json',
+      'x-user-name': encodeURIComponent(userName),
+      ...(options.headers || {})
+    };
+
+    if (adminToken) headers['x-admin-token'] = adminToken;
+
+    const res = await fetch(path, { ...options, headers });
 
     if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
 
@@ -1363,25 +1850,41 @@
   }
 
 
+  function renderList() {
+
+    $('saved-count').textContent = sheetList.length;
+
+    $('saved-list').innerHTML = sheetList.map(s => {
+
+      const done = s.deliveries && s.answered === s.deliveries;
+      const pill = s.status === 'closed'
+        ? '<span class="pill closed">Closed</span>'
+        : `<span class="pill ${done ? 'done' : ''}">${s.answered || 0}/${s.deliveries || 0} durations</span>`;
+
+      return `
+        <li class="${s.id === currentId && sheetSaved ? 'current' : ''}">
+          <span class="info">
+            <strong>${escapeHtml(s.date?.text || 'No date')}</strong>
+            ${s.day ? '· ' + escapeHtml(s.day) : ''}
+            ${s.route ? `· <span class="dot" style="--c:${safeHex(s.routeHex)}"></span> ${escapeHtml(s.route)}` : ''}
+            ${pill}
+            <br><small>Last saved by ${escapeHtml(s.updatedBy)} · ${new Date(s.updatedAt).toLocaleString('en-GB')}</small>
+          </span>
+          <button type="button" data-open="${escapeHtml(s.id)}">Open</button>
+          ${isAdmin ? `<button type="button" class="danger" data-delete="${escapeHtml(s.id)}">Delete</button>` : ''}
+        </li>`;
+
+    }).join('') || '<li><span class="info"><small>No sheets yet.</small></span></li>';
+
+  }
+
+
   async function loadList() {
 
     try {
 
-      const list = await api('/api/sheets');
-
-      $('saved-count').textContent = list.length;
-
-      $('saved-list').innerHTML = list.map(s => `
-        <li>
-          <span>
-            <strong>${escapeHtml(s.date?.text || 'No date')}</strong>
-            ${s.day ? '· ' + escapeHtml(s.day) : ''}
-            ${s.route ? `· <span class="dot" style="--c:${safeHex(s.routeHex)}"></span> ${escapeHtml(s.route)}` : ''}
-            <br><small>Last saved by ${escapeHtml(s.updatedBy)} · ${new Date(s.updatedAt).toLocaleString('en-GB')}</small>
-          </span>
-          <button type="button" data-open="${escapeHtml(s.id)}">Open</button>
-          <button type="button" class="danger" data-delete="${escapeHtml(s.id)}">Delete</button>
-        </li>`).join('') || '<li><span><small>No saved sheets yet.</small></span></li>';
+      sheetList = await api('/api/sheets');
+      renderList();
 
     } catch (err) {
 
@@ -1394,14 +1897,20 @@
 
   async function save() {
 
+    if (!isAdmin) return;
+
     setStatus('Saving…');
 
     try {
 
-      await api('/api/sheets/' + currentId, {
+      const sheet = await api('/api/sheets/' + currentId, {
         method: 'PUT',
         body: JSON.stringify(readForm())
       });
+
+      sheetSaved = true;
+      savedKeys = new Set((sheet.rows || []).map(r => r.key).filter(Boolean));
+      mergeDurations(sheet);
 
       setStatus('Saved ' + new Date().toLocaleTimeString('en-GB'), 'ok');
 
@@ -1423,12 +1932,15 @@
       const sheet = await api('/api/sheets/' + id);
 
       currentId = sheet.id;
+      sheetSaved = true;
 
       writeForm(sheet);
 
       loadCalendar();
 
-      setStatus('Opened', 'ok');
+      setStatus(isAdmin ? 'Opened' : '', 'ok');
+
+      if (!isAdmin) $('saved-box').open = false;
 
       window.scrollTo({ top: 0, behavior: 'smooth' });
 
@@ -1441,9 +1953,32 @@
   }
 
 
+  // reload the sheet from the server (team: all of it; admin: durations + status)
+  async function reloadCurrent(quiet) {
+
+    if (!sheetSaved) return;
+
+    try {
+
+      const sheet = await api('/api/sheets/' + currentId);
+
+      if (isAdmin) mergeDurations(sheet);
+      else writeForm(sheet);
+
+      if (!quiet) setStatus('Updated ' + new Date().toLocaleTimeString('en-GB'), 'ok');
+
+    } catch (err) {
+
+      if (!quiet) setStatus('Could not refresh', 'err');
+
+    }
+
+  }
+
+
   async function deleteSheet(id) {
 
-    if (!confirm('Delete this sheet?')) return;
+    if (!confirm('Delete this sheet and all its duration answers?')) return;
 
     try {
 
@@ -1455,7 +1990,36 @@
 
     } catch (err) {
 
-      setStatus('Delete failed', 'err');
+      setStatus('Delete failed: ' + err.message, 'err');
+
+    }
+
+  }
+
+
+  async function toggleClose() {
+
+    if (!sheetSaved) return;
+
+    const closing = sheetStatus !== 'closed';
+
+    if (closing && !confirm('Close this day? Nobody will be able to change the durations after that (you can reopen it).')) return;
+
+    try {
+
+      const sheet = await api(`/api/sheets/${currentId}/${closing ? 'close' : 'reopen'}`, { method: 'POST' });
+
+      mergeDurations(sheet);
+
+      setStatus(closing ? 'Day closed' : 'Day reopened', 'ok');
+
+      loadList();
+
+      if (closing) openAnswers();
+
+    } catch (err) {
+
+      setStatus('Failed: ' + err.message, 'err');
 
     }
 
@@ -1465,12 +2029,32 @@
   function newSheet() {
 
     currentId = newId();
+    sheetSaved = false;
+    sheetStatus = 'open';
+    sheetInfo = {};
 
     writeForm({});
 
     loadCalendar();
 
     setStatus('');
+
+  }
+
+
+  // team member: open today's sheet by itself when there is only one
+  function autoOpen() {
+
+    if (isAdmin || sheetSaved) return;
+
+    const today = todayIso();
+    const open = sheetList.filter(s => s.status !== 'closed' && listIso(s) === today);
+
+    if (open.length === 1) {
+      openSheet(open[0].id);
+    } else {
+      $('saved-box').open = true;
+    }
 
   }
 
@@ -1483,26 +2067,77 @@
 
     $('gate').classList.remove('hidden');
     $('gate-name').value = userName;
+    $('gate-admin').checked = !!adminToken;
+    $('gate-pass').value = '';
+    $('gate-pass').classList.add('hidden');
+    $('gate-error').classList.add('hidden');
     $('gate-name').focus();
 
   }
 
 
-  async function enter(name) {
+  async function enter(name, wantsAdmin, password) {
 
     userName = name;
-
     safeSet(NAME_KEY, name);
 
-    $('who').innerHTML = `${escapeHtml(name)} <small>signed in</small>`;
+    const showError = msg => {
+      $('gate-error').textContent = msg;
+      $('gate-error').classList.remove('hidden');
+    };
 
+    if (!wantsAdmin) {
+      adminToken = '';
+    } else if (password) {
+      try {
+        const res = await api('/api/admin/login', {
+          method: 'POST',
+          body: JSON.stringify({ password })
+        });
+        adminToken = res.token;
+      } catch (err) {
+        showError(err.message);
+        return;
+      }
+    } else if (!adminToken) {
+      showError('Type the admin password');
+      $('gate-pass').classList.remove('hidden');
+      $('gate-pass').focus();
+      return;
+    }
+
+    // check the saved token is still valid
+    try {
+      const me = await api('/api/me');
+      if (wantsAdmin && !me.admin) {
+        adminToken = '';
+        safeSet(TOKEN_KEY, '');
+        showError('Admin session expired – type the password again');
+        $('gate-pass').classList.remove('hidden');
+        $('gate-pass').focus();
+        return;
+      }
+      isAdmin = !!me.admin;
+    } catch (err) {
+      showError('Could not connect: ' + err.message);
+      return;
+    }
+
+    safeSet(TOKEN_KEY, adminToken);
+
+    $('who').textContent = name;
     $('gate').classList.add('hidden');
+
+    applyRole();
+    renderRows();
 
     try { await api('/api/hello', { method: 'POST' }); } catch {}
 
-    loadList();
+    await loadList();
 
-    if (sheetIsoDate()) loadCalendar();
+    if (isAdmin && sheetIsoDate()) loadCalendar();
+
+    autoOpen();
 
   }
 
@@ -1511,10 +2146,16 @@
   // EVENTS
   // =========================================
 
-  $('gate-form').addEventListener('submit', e => {
+  $('gate').addEventListener('submit', e => {
     e.preventDefault();
     const name = $('gate-name').value.trim();
-    if (name) enter(name);
+    if (name) enter(name, $('gate-admin').checked, $('gate-pass').value);
+  });
+
+  $('gate-admin').addEventListener('change', () => {
+    const show = $('gate-admin').checked && !adminToken;
+    $('gate-pass').classList.toggle('hidden', !show);
+    if (show) $('gate-pass').focus();
   });
 
   $('change-user').addEventListener('click', showGate);
@@ -1541,7 +2182,12 @@
   $('btn-new').addEventListener('click', () => {
     if (confirm('Start a new blank sheet? Unsaved changes will be lost.')) newSheet();
   });
+  $('btn-answers').addEventListener('click', openAnswers);
+  $('btn-close').addEventListener('click', toggleClose);
+  $('btn-reload').addEventListener('click', () => { loadList(); reloadCurrent(false); });
   $('btn-print').addEventListener('click', () => window.print());
+
+  $('ans-csv').addEventListener('click', downloadCsv);
 
   $('saved-list').addEventListener('click', e => {
     const open = e.target.closest('[data-open]');
@@ -1555,7 +2201,9 @@
     const t = e.target;
     const i = Number(t.dataset.row);
     if (t.dataset.field === 'pick') onPick(i);
+    else if (t.dataset.field === 'duration') onDuration(i);
     else if (t.dataset.field === 'kind' || t.dataset.field === 'number') {
+      resetRowDuration(i);
       linkRow(i);
       // number typed by hand exists in the calendar -> show it as a normal option
       if (findEvent(field(i, 'kind').value, field(i, 'number').value.trim())) manualMode[i] = false;
@@ -1577,11 +2225,13 @@
     if (card) openCard(Number(card.dataset.card));
   });
 
-  // card modal
-  $('cm-close').addEventListener('click', closeCard);
-  $('card-modal').addEventListener('click', e => { if (e.target === $('card-modal')) closeCard(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCard(); });
-
+  // modals
+  document.querySelectorAll('.modal').forEach(m => {
+    m.addEventListener('click', e => {
+      if (e.target === m || e.target.closest('[data-close]')) closeModals();
+    });
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModals(); });
 
   // =========================================
   // INIT
@@ -1590,7 +2240,7 @@
   buildHeader();
   buildRows();
   renderRoute();
-  renderRows();
+  applyRole();
 
   // Name is asked on every page load (pre-filled with the last one used)
   showGate();
