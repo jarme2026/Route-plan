@@ -715,8 +715,19 @@
       .replace(/\b(PP|OS)\s*[-:#.]?\s*\d{3,}/i, '')
       .replace(/^[\s\-–:,]+/, '')
       .trim();
+    const time = ev.allDay ? 'All day' : ev.start;
+    if (!ev.number) {
+      const t = (ev.title || '').trim();
+      return `${time} · ${t.length > 34 ? t.slice(0, 33) + '…' : t}`;
+    }
     const short = rest.length > 28 ? rest.slice(0, 27) + '…' : rest;
-    return `${ev.kind} ${ev.number} · ${ev.allDay ? 'All day' : ev.start}${short ? ' ' + short : ''}`;
+    return `${ev.kind} ${ev.number} · ${time}${short ? ' ' + short : ''}`;
+  }
+
+
+  // Unique key of an event: its PP / OS, or time + title when it has none
+  function evKey(ev) {
+    return ev.number ? ev.kind + ':' + ev.number : 'T:' + (ev.start || '') + '|' + (ev.title || '');
   }
 
 
@@ -869,7 +880,9 @@
 
   function rowKey(i) {
     const num = field(i, 'number').value.trim();
-    return num ? field(i, 'kind').value + ':' + num : '';
+    if (num) return field(i, 'kind').value + ':' + num;
+    const ev = rowEvents[i];
+    return (ev && !ev.number) ? evKey(ev) : '';
   }
 
 
@@ -888,7 +901,6 @@
     const map = new Map();
 
     for (const ev of dayEvents) {
-      if (!ev.number) continue;            // only deliveries with a PP / OS
       const c = colorOf(ev);
       if (!map.has(c.name)) map.set(c.name, { ...c, events: [] });
       map.get(c.name).events.push(ev);
@@ -921,7 +933,7 @@
       sel.innerHTML = '<option value="">Choose the date first</option>';
     } else {
       const opts = routes.map(r =>
-        `<option value="${escapeHtml(r.name)}">${escapeHtml(r.name)} – ${r.events.length} deliver${r.events.length === 1 ? 'y' : 'ies'}</option>`);
+        `<option value="${escapeHtml(r.name)}">${escapeHtml(r.name)} – ${r.events.length} event${r.events.length === 1 ? '' : 's'}</option>`);
       // keep a saved route that has no events any more
       if (currentRoute && !routes.some(r => r.name === currentRoute)) {
         opts.push(`<option value="${escapeHtml(currentRoute)}">${escapeHtml(currentRoute)}</option>`);
@@ -959,7 +971,7 @@
     const seen = new Set();
 
     for (const ev of (route ? route.events : [])) {
-      const k = ev.kind + ':' + ev.number;
+      const k = evKey(ev);
       seen.add(k);
       const taken = used.has(k) && k !== key;
       opts.push(`<option value="${escapeHtml(k)}" ${taken ? 'disabled' : ''}>${escapeHtml(optionLabel(ev))}${taken ? ' (on sheet)' : ''}</option>`);
@@ -987,7 +999,8 @@
 
     $('manual-' + i).classList.toggle('hidden', !manual);
 
-    $('print-ref-' + i).textContent = key ? key.replace(':', ' ') : '';
+    const num = field(i, 'number').value.trim();
+    $('print-ref-' + i).textContent = num ? field(i, 'kind').value + ' ' + num : '';
 
   }
 
@@ -1055,7 +1068,13 @@
     const num = field(i, 'number').value.trim();
 
     if (!num) {
-      rowEvents[i] = null;
+      const kept = rowEvents[i];
+      if (kept && !kept.number && !manualMode[i] && kept.date === sheetIsoDate()) {
+        const live = dayEvents.find(ev => evKey(ev) === evKey(kept));
+        if (live) rowEvents[i] = snapshot(live);
+      } else {
+        rowEvents[i] = null;
+      }
       return;
     }
 
@@ -1090,6 +1109,12 @@
       field(i, 'kind').value = 'PP';
       field(i, 'number').value = '';
       rowEvents[i] = null;
+    } else if (value.startsWith('T:')) {
+      // event without PP / OS: link the event, leave the number empty
+      const ev = dayEvents.find(x => evKey(x) === value);
+      field(i, 'kind').value = 'PP';
+      field(i, 'number').value = '';
+      rowEvents[i] = ev ? snapshot(ev) : null;
     } else {
       const [kind, number] = value.split(':');
       field(i, 'kind').value = kind;
@@ -1118,7 +1143,7 @@
 
     for (const ev of route.events) {
 
-      const k = ev.kind + ':' + ev.number;
+      const k = evKey(ev);
       if (used.has(k)) continue;
 
       let row = -1;
@@ -1128,9 +1153,10 @@
 
       if (row === -1) { noRoom++; continue; }
 
-      field(row, 'kind').value = ev.kind;
-      field(row, 'number').value = ev.number;
-      linkRow(row);
+      field(row, 'kind').value = ev.kind || 'PP';
+      field(row, 'number').value = ev.number || '';
+      if (ev.number) linkRow(row);
+      else rowEvents[row] = snapshot(ev);
       used.add(k);
       placed++;
 
@@ -1162,7 +1188,7 @@
 
     $('cm-box').style.setProperty('--c', safeHex(ev.colorHex));
     $('cm-color').textContent = ev.colorName || '';
-    $('cm-ref').textContent = `${ev.kind} ${ev.number}`;
+    $('cm-ref').textContent = ev.number ? `${ev.kind} ${ev.number}` : 'No PP / OS';
     $('cm-when').textContent = [dateText, timeLabel(ev)].filter(Boolean).join(' · ');
     $('cm-title').textContent = ev.title || '';
 
