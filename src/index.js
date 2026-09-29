@@ -322,13 +322,16 @@ export default {
 
     if (url.pathname.startsWith('/api/')) {
 
-      // Calendar push from Google needs the secret SYNC_KEY
+      // Calendar push from Google needs the secret SYNC_KEY (or SYNC_TOKEN)
       if (url.pathname === '/api/calendar/sync') {
 
         const key =
           request.headers.get('x-sync-key') || '';
 
-        if (!env.SYNC_KEY || key !== env.SYNC_KEY) {
+        const secret =
+          env.SYNC_KEY || env.SYNC_TOKEN || '';
+
+        if (!secret || key !== secret) {
 
           return json({ error: 'Wrong or missing sync key' }, 401);
 
