@@ -25,9 +25,11 @@
     background: var(--bg);
   }
 
+  .hidden { display: none !important; }
+
   /* ---------- NAME GATE ---------- */
 
-  #gate {
+  #gate, #card-modal {
     position: fixed;
     inset: 0;
     display: flex;
@@ -37,8 +39,6 @@
     z-index: 50;
     padding: 16px;
   }
-
-  #gate.hidden { display: none; }
 
   .gate-card {
     background: var(--paper);
@@ -92,30 +92,33 @@
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   button.danger { color: var(--danger); }
   button.link { border: 0; background: none; color: var(--accent); padding: 0 4px; }
+  button.small { font-size: 13px; padding: 4px 10px; }
 
   #status { font-size: 14px; color: var(--muted); min-width: 120px; }
   #status.ok { color: var(--ok); }
   #status.err { color: var(--danger); }
 
-  /* ---------- SAVED LIST ---------- */
+  /* ---------- SAVED LIST + CALENDAR PANELS ---------- */
 
-  #saved {
+  .panel {
     max-width: 820px;
     margin: 12px auto 0;
     padding: 0 16px;
   }
 
-  #saved details {
+  .panel > details {
     background: #fff;
     border: 1px solid #d5d8dd;
     border-radius: 8px;
     padding: 8px 12px;
   }
 
-  #saved summary { cursor: pointer; font-weight: 600; }
-  #saved ul { list-style: none; padding: 0; margin: 8px 0 0; }
+  .panel summary { cursor: pointer; font-weight: 600; }
+  .panel summary small { font-weight: 400; color: var(--muted); }
 
-  #saved li {
+  #saved-list { list-style: none; padding: 0; margin: 8px 0 0; }
+
+  #saved-list li {
     display: flex;
     gap: 8px;
     align-items: center;
@@ -124,8 +127,83 @@
     font-size: 14px;
   }
 
-  #saved li span { flex: 1; }
-  #saved li small { color: var(--muted); }
+  #saved-list li span { flex: 1; }
+  #saved-list li small { color: var(--muted); }
+
+  .cal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin: 8px 0 10px;
+  }
+
+  .cal-actions small { color: var(--muted); margin-right: auto; }
+
+  .muted { color: var(--muted); font-size: 14px; padding: 6px 0; }
+
+  .cal-groups {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 12px;
+  }
+
+  .cal-group {
+    border: 1px solid #dfe2e6;
+    border-top: 5px solid var(--c, #999);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .cal-group-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: #fafbfc;
+  }
+
+  .cal-group-head strong { font-size: 16px; }
+  .cal-group-head small { color: var(--muted); margin-right: auto; }
+
+  .dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--c, #999);
+    flex: 0 0 auto;
+  }
+
+  .cal-group ul { list-style: none; margin: 0; padding: 0; }
+
+  .cal-group li label {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 8px;
+    align-items: start;
+    padding: 7px 10px;
+    border-top: 1px solid #eee;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  .cal-group li.added label, .cal-group li.noref label { cursor: default; }
+  .cal-group li.added label { opacity: .5; }
+  .cal-group input[type=checkbox] { width: 18px; height: 18px; margin: 1px 0 0; }
+
+  .ev-time { display: block; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .ev-loc { display: block; color: var(--muted); font-size: 13px; }
+
+  .ref {
+    font-weight: 700;
+    white-space: nowrap;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: #eef3fb;
+    font-size: 13px;
+  }
+
+  .ref.none { background: #fdf0ee; color: var(--danger); font-weight: 400; }
 
   /* ---------- PAPER ---------- */
 
@@ -180,25 +258,6 @@
     background: #f4f8ff;
   }
 
-  .team input { width: 100%; margin-bottom: 6px; }
-
-  .van-table {
-    border-collapse: collapse;
-    width: 100%;
-    max-width: 260px;
-  }
-
-  .van-table td {
-    border: 2px solid var(--line);
-    padding: 4px 6px;
-    height: 34px;
-  }
-
-  .van-table td.check { width: 44px; text-align: center; }
-  .van-table td.plate { font-weight: 700; text-align: center; }
-  .van-table input[type=checkbox] { width: 20px; height: 20px; }
-  .van-table input[type=text] { width: 100%; border: 0; text-align: center; font-weight: 700; }
-
   .wide { width: 100%; }
 
   /* ---------- DELIVERIES ---------- */
@@ -221,13 +280,11 @@
   table.deliveries thead th { border-top: 0; }
 
   table.deliveries th { font-size: 20px; font-weight: 700; }
-  table.deliveries th.small { font-size: 13px; }
 
-  table.deliveries td { height: 56px; vertical-align: middle; }
+  table.deliveries td { height: 60px; vertical-align: middle; }
 
-  col.c-del { width: 11%; }
-  col.c-chk { width: 11%; }
-  col.c-pp { width: 28%; }
+  col.c-card { width: 38%; }
+  col.c-pp { width: 27%; }
 
   .pp {
     display: flex;
@@ -248,6 +305,34 @@
   .times .dash { font-weight: 700; font-size: 20px; }
   .times select { width: 100%; }
 
+  /* shortcut card in the first column */
+  .card-link {
+    display: block;
+    width: 100%;
+    text-align: left;
+    font-size: 13px;
+    line-height: 1.25;
+    padding: 4px 8px;
+    border: 1px solid #d5d8dd;
+    border-left: 6px solid var(--c, #999);
+    border-radius: 6px;
+    background: #fafbfc;
+  }
+
+  .card-link:hover { background: #f1f5fb; }
+
+  .card-link .cl-time { font-weight: 700; }
+  .card-link .cl-title,
+  .card-link .cl-loc {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .card-link .cl-loc { color: var(--muted); }
+
+  .no-event { font-size: 13px; color: var(--muted); font-style: italic; }
+
   .sign {
     padding: 22px 14px 6px;
     display: grid;
@@ -258,142 +343,70 @@
 
   .sign input { width: 100%; }
 
+  /* ---------- CARD (modal) ---------- */
+
+  .card-box {
+    background: var(--paper);
+    width: 100%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow: auto;
+    border-radius: 12px;
+    border-top: 10px solid var(--c, #999);
+    padding: 16px 20px 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, .3);
+  }
+
+  .card-top { display: flex; align-items: center; gap: 8px; }
+  .card-top .chip { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); margin-right: auto; }
+
+  .cm-ref { font-size: 26px; font-weight: 700; margin: 8px 0 2px; }
+  .cm-when { color: var(--muted); font-size: 15px; }
+  .card-box h2 { font-size: 19px; margin: 12px 0; }
+
+  .cm-block { border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px; }
+  .cm-block .label { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .cm-desc { white-space: pre-wrap; font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; }
+  .card-box a { color: var(--accent); }
+
   @media (max-width: 640px) {
     .paper { padding: 8px; }
-    .head { grid-template-columns: 1fr; }
     table.deliveries th { font-size: 14px; }
-    table.deliveries th.small { font-size: 11px; }
-    col.c-del, col.c-chk { width: 12%; }
-    col.c-pp { width: 34%; }
+    col.c-card { width: 36%; }
+    col.c-pp { width: 32%; }
     .times { grid-template-columns: 1fr; gap: 2px; }
     .times .dash { display: none; }
     select, input[type=text] { font-size: 14px; padding: 4px; }
+    .card-link { font-size: 12px; padding: 3px 6px; }
+    .cal-groups { grid-template-columns: 1fr; }
   }
 
-  /* ---------- CALENDAR ---------- */
+  /* ---------- PRINT (A4, like the paper form) ---------- */
 
-  #calendar {
-    max-width: 820px;
-    margin: 12px auto 0;
-    padding: 0 16px;
+  @media print {
+    @page { size: A4; margin: 12mm; }
+
+    body { background: #fff; }
+
+    .toolbar, .panel, #gate, #card-modal { display: none !important; }
+
+    .paper { box-shadow: none; margin: 0; padding: 0; max-width: none; }
+
+    select {
+      -webkit-appearance: none;
+      appearance: none;
+      background: none;
+    }
+
+    select, input[type=text] { border-bottom-color: transparent; }
+
+    .head select, .sign input { border-bottom-color: var(--line); }
+
+    .card-link { border: 0; background: none; padding: 0; }
+    .no-event { display: none; }
+
+    table.deliveries td { height: 64px; }
   }
-
-  .cal-card {
-    background: #fff;
-    border: 1px solid #d5d8dd;
-    border-radius: 8px;
-    padding: 10px 12px;
-  }
-
-  .cal-head {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-  }
-
-  .cal-head strong { margin-right: auto; }
-  .cal-head small { color: var(--muted); }
-
-  .cal-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; margin-top: 6px; }
-  .cal-legend span::before {
-    content: '';
-    display: inline-block;
-    width: 10px;
-    height: 10px;
-    border-radius: 2px;
-    margin-right: 4px;
-    background: var(--c);
-  }
-  .cal-legend .err { color: var(--danger); }
-
-  #cal-events { list-style: none; padding: 0; margin: 8px 0 0; }
-
-  #cal-events li {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    padding: 7px 8px;
-    margin-top: 6px;
-    border-left: 4px solid var(--c);
-    background: #f7f8fa;
-    border-radius: 4px;
-    font-size: 14px;
-  }
-
-  #cal-events li .when { font-weight: 700; min-width: 92px; }
-  #cal-events li .what { flex: 1; min-width: 0; }
-  #cal-events li .what small { display: block; color: var(--muted); }
-  #cal-events li .tags { color: var(--accent); font-weight: 700; font-size: 13px; }
-  #cal-events .empty { border: 0; background: none; color: var(--muted); }
-
-  /* ---------- ROLES ---------- */
-
-  .gate-card .admin-toggle { display: block; margin: -4px 0 14px; font-size: 14px; }
-  .gate-card .error { color: var(--danger); font-size: 14px; margin: -6px 0 12px; min-height: 1em; }
-  #gate-pass-wrap.hidden { display: none; }
-
-  .role-badge {
-    display: inline-block;
-    font-size: 12px;
-    font-weight: 700;
-    padding: 2px 8px;
-    border-radius: 999px;
-    background: #e7eefb;
-    color: var(--accent);
-    margin-left: 6px;
-    vertical-align: middle;
-  }
-
-  .badge-visible { background: #e3f4ea; color: var(--ok); }
-  .badge-hidden { background: #eee; color: var(--muted); }
-
-  body.staff .admin-only { display: none !important; }
-  body:not(.staff) .staff-only { display: none !important; }
-
-  /* read-only fields keep the ink colour */
-  select:disabled, input:disabled {
-    color: var(--ink);
-    -webkit-text-fill-color: var(--ink);
-    opacity: 1;
-    cursor: default;
-  }
-
-  select:disabled { -webkit-appearance: none; appearance: none; }
-
-  body.staff .times select {
-    background: #fffbe6;
-    border-bottom-color: #d9a400;
-  }
-
-  .row-by { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; text-align: center; }
-
-  #empty-staff {
-    max-width: 820px;
-    margin: 40px auto;
-    padding: 24px 16px;
-    text-align: center;
-    color: var(--muted);
-    font-size: 17px;
-  }
-
-  #empty-staff.hidden, main.hidden { display: none; }
-
-  #cal-events li.choose { outline: 2px dashed #d9a400; }
-  #cal-events li .none { font-size: 12px; color: var(--muted); }
-
-  .row-clear {
-    flex: 0 0 auto;
-    padding: 2px 8px;
-    font-size: 16px;
-    line-height: 1;
-    color: var(--muted);
-  }
-
-  input[data-field=number][readonly] { cursor: default; }
-  tr.invalid td { background: #fdecea; }
-  #cal-events li .picks { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-  #cal-events li .picks button { font-size: 13px; padding: 6px 10px; }
 </style>
 </head>
 <body>
@@ -404,13 +417,30 @@
     <h1>Delivery Sheet</h1>
     <p>Please enter your name to continue.</p>
     <input id="gate-name" type="text" autocomplete="name" placeholder="Your name" maxlength="60" required>
-    <button class="link admin-toggle" id="gate-admin-toggle" type="button">I'm the admin</button>
-    <div id="gate-pass-wrap" class="hidden">
-      <input id="gate-pass" type="password" autocomplete="current-password" placeholder="Admin password">
-    </div>
-    <div class="error" id="gate-error"></div>
     <button class="primary wide" type="submit">Enter</button>
   </form>
+</div>
+
+<!-- ================= EVENT CARD ================= -->
+<div id="card-modal" class="hidden" role="dialog" aria-modal="true" aria-labelledby="cm-title">
+  <div class="card-box" id="cm-box">
+    <div class="card-top">
+      <span class="chip"><span class="dot"></span><span id="cm-color"></span></span>
+      <button type="button" class="small" id="cm-close" aria-label="Close">Close</button>
+    </div>
+    <div class="cm-ref" id="cm-ref"></div>
+    <div class="cm-when" id="cm-when"></div>
+    <h2 id="cm-title"></h2>
+    <div class="cm-block" id="cm-loc-block">
+      <span class="label">Address</span>
+      <div id="cm-loc"></div>
+      <a id="cm-map" target="_blank" rel="noopener">Open in Google Maps</a>
+    </div>
+    <div class="cm-block" id="cm-desc-block">
+      <span class="label">Event details</span>
+      <div class="cm-desc" id="cm-desc"></div>
+    </div>
+  </div>
 </div>
 
 <!-- ================= TOOLBAR ================= -->
@@ -420,38 +450,30 @@
     <button class="link" id="change-user" type="button">change</button>
   </div>
   <span id="status"></span>
-  <button type="button" id="btn-refresh">Refresh</button>
-  <button type="button" class="admin-only" id="btn-new">New</button>
-  <button type="button" class="primary admin-only" id="btn-save">Save</button>
+  <button type="button" id="btn-new">New</button>
+  <button type="button" class="primary" id="btn-save">Save</button>
+  <button type="button" id="btn-print">Print</button>
 </div>
 
-<!-- ================= CALENDAR (admin) ================= -->
-<div id="calendar" class="admin-only">
-  <div class="cal-card">
-    <div class="cal-head">
-      <strong>Calendar · <span id="cal-date">select a date</span></strong>
-      <small id="cal-updated"></small>
-      <button type="button" id="btn-fill">Fill sheet from calendar</button>
-    </div>
-    <div class="cal-legend" id="cal-legend"></div>
-    <ul id="cal-events"></ul>
-  </div>
-</div>
-
-<!-- ================= SHEETS LIST ================= -->
-<div id="saved">
-  <details id="saved-details">
-    <summary>
-      <span class="admin-only">Saved sheets</span>
-      <span class="staff-only">Available sheets</span>
-      (<span id="saved-count">0</span>)
-    </summary>
+<!-- ================= SAVED SHEETS ================= -->
+<div class="panel" id="saved">
+  <details>
+    <summary>Saved sheets (<span id="saved-count">0</span>)</summary>
     <ul id="saved-list"></ul>
   </details>
 </div>
 
-<div id="empty-staff" class="hidden">
-  No sheet is available yet.<br>Ask the admin to make today's sheet visible, then press Refresh.
+<!-- ================= GOOGLE CALENDAR ================= -->
+<div class="panel" id="calendar">
+  <details open>
+    <summary>Google Calendar <small id="cal-summary">– choose a date</small></summary>
+    <div class="cal-actions">
+      <small id="cal-synced"></small>
+      <button type="button" id="cal-refresh">Refresh</button>
+      <button type="button" class="primary" id="cal-add">Add selected to sheet</button>
+    </div>
+    <div id="cal-body"><div class="muted">Pick the date of the sheet to see that day's calendar events.</div></div>
+  </details>
 </div>
 
 <!-- ================= SHEET ================= -->
@@ -460,65 +482,31 @@
 
     <div class="head">
 
-      <div>
-        <div class="field">
-          <span class="label">Date:</span>
-          <div class="date-row">
-            <select id="date-day" aria-label="Day of month"></select>
-            <span class="sep">/</span>
-            <select id="date-month" aria-label="Month"></select>
-            <span class="sep">/</span>
-            <select id="date-year" aria-label="Year"></select>
-          </div>
-        </div>
-
-        <div class="field" style="margin-top:14px">
-          <label for="weekday">Day</label>
-          <select id="weekday" class="wide"></select>
-        </div>
-
-        <div class="field" style="margin-top:14px">
-          <label for="message">Message send:</label>
-          <input id="message" type="text" class="wide">
+      <div class="field">
+        <span class="label">Date:</span>
+        <div class="date-row">
+          <select id="date-day" aria-label="Day of month"></select>
+          <span class="sep">/</span>
+          <select id="date-month" aria-label="Month"></select>
+          <span class="sep">/</span>
+          <select id="date-year" aria-label="Year"></select>
         </div>
       </div>
 
-      <div>
-        <div class="field team">
-          <span class="label">Delivery team:</span>
-          <input id="team-1" type="text" aria-label="Delivery team member 1">
-          <input id="team-2" type="text" aria-label="Delivery team member 2">
-        </div>
-
-        <div class="field" style="margin-top:10px">
-          <span class="label">Van:</span>
-          <table class="van-table">
-            <tr>
-              <td class="check"><input type="checkbox" id="van-1" aria-label="Van 241D46401"></td>
-              <td class="plate">241D46401</td>
-            </tr>
-            <tr>
-              <td class="check"><input type="checkbox" id="van-2" aria-label="Van 251D8219"></td>
-              <td class="plate">251D8219</td>
-            </tr>
-            <tr>
-              <td class="check"><input type="checkbox" id="van-3" aria-label="Other van"></td>
-              <td><input type="text" id="van-3-plate" aria-label="Other van plate"></td>
-            </tr>
-          </table>
-        </div>
+      <div class="field">
+        <label for="weekday">Day:</label>
+        <select id="weekday" class="wide"></select>
       </div>
 
     </div>
 
     <table class="deliveries">
       <colgroup>
-        <col class="c-del"><col class="c-chk"><col class="c-pp"><col>
+        <col class="c-card"><col class="c-pp"><col>
       </colgroup>
       <thead>
         <tr>
-          <th class="small">Del. No.</th>
-          <th class="small">Confirm<br>check</th>
+          <th>Delivery</th>
           <th>PP / OS</th>
           <th>Time in &nbsp;-&nbsp; Time out</th>
         </tr>
@@ -567,10 +555,29 @@
     DURATIONS.push(m);
   }
 
+  // Google Calendar event colours (colour id -> name, hex)
+  const EVENT_COLORS = {
+    '1': ['Lavender', '#7986cb'],
+    '2': ['Sage', '#33b679'],
+    '3': ['Grape', '#8e24aa'],
+    '4': ['Flamingo', '#e67c73'],
+    '5': ['Yellow', '#f6bf26'],
+    '6': ['Orange', '#f4511e'],
+    '7': ['Blue', '#039be5'],
+    '8': ['Grey', '#616161'],
+    '9': ['Dark blue', '#3f51b5'],
+    '10': ['Green', '#0b8043'],
+    '11': ['Red', '#d50000']
+  };
+
+  // Lists shown first, in this order
+  const GROUP_ORDER = ['Orange', 'Blue'];
+
   const NAME_KEY = 'delivery-sheet:name';
-  const ADMIN_KEY = 'delivery-sheet:admin-token';
 
   const $ = id => document.getElementById(id);
+
+  const field = (i, f) => document.querySelector(`[data-row="${i}"][data-field="${f}"]`);
 
 
   // =========================================
@@ -611,10 +618,7 @@
   }
 
   function safeSet(key, value) {
-    try {
-      if (value) localStorage.setItem(key, value);
-      else localStorage.removeItem(key);
-    } catch {}
+    try { localStorage.setItem(key, value); } catch {}
   }
 
   function newId() {
@@ -633,12 +637,45 @@
     })[c]);
   }
 
-  function timeNow() {
-    return new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  function safeHex(hex) {
+    return /^#[0-9a-f]{6}$/i.test(hex || '') ? hex : '#9e9e9e';
   }
 
-  function rowField(i, f) {
-    return document.querySelector(`[data-row="${i}"][data-field="${f}"]`);
+  // Name for a colour that is not one of Google's event colours
+  function hueName(hex) {
+    const n = parseInt(safeHex(hex).slice(1), 16);
+    const r = (n >> 16) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+    if (d < 0.12) return 'Grey';
+    let h;
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h = (h * 60 + 360) % 360;
+    if (h < 12 || h >= 340) return 'Red';
+    if (h < 45) return 'Orange';
+    if (h < 70) return 'Yellow';
+    if (h < 170) return 'Green';
+    if (h < 260) return 'Blue';
+    return 'Purple';
+  }
+
+  // Google Calendar descriptions may contain simple HTML -> plain text
+  function descriptionText(html) {
+    if (!html) return '';
+    const withBreaks = String(html)
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(p|div|li)>/gi, '\n');
+    const doc = new DOMParser().parseFromString(withBreaks, 'text/html');
+    return (doc.body.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  function linkify(escaped) {
+    return escaped.replace(/https?:\/\/[^\s<]+/g, url => `<a href="${url}" target="_blank" rel="noopener">${url}</a>`);
+  }
+
+  function timeLabel(ev) {
+    return ev.allDay ? 'All day' : `${ev.start}–${ev.end}`;
   }
 
 
@@ -649,6 +686,7 @@
   function buildHeader() {
 
     fillSelect($('date-month'), MONTHS.map((name, i) => [i + 1, name]), 'Month');
+
     fillSelect($('date-year'), YEARS.map(y => [y, String(y)]), 'Year');
 
     $('date-year').value = String(YEARS[0]);
@@ -706,16 +744,14 @@
       const tr = document.createElement('tr');
 
       tr.innerHTML = `
-        <td></td>
-        <td></td>
+        <td id="card-${i}"></td>
         <td>
           <div class="pp">
             <select data-row="${i}" data-field="kind" aria-label="PP or OS">
               <option value="PP">PP</option>
               <option value="OS">OS</option>
             </select>
-            <input type="text" data-row="${i}" data-field="number" readonly placeholder="" aria-label="PP / OS number (from calendar)">
-            <button type="button" class="row-clear admin-only" data-clear="${i}" title="Clear row" aria-label="Clear row">×</button>
+            <input type="text" data-row="${i}" data-field="number" inputmode="numeric" aria-label="PP / OS number">
           </div>
         </td>
         <td>
@@ -724,7 +760,6 @@
             <span class="dash">-</span>
             <select data-row="${i}" data-field="timeOut" aria-label="Time out"></select>
           </div>
-          <small class="row-by" data-row="${i}" data-field="by"></small>
         </td>`;
 
       fillSelect(tr.querySelector('[data-field=timeIn]'), durationOptions, '—');
@@ -738,27 +773,327 @@
 
 
   // =========================================
-  // ROLE
+  // CALENDAR STATE
   // =========================================
 
-  let userName = safeGet(NAME_KEY);
-  let adminToken = safeGet(ADMIN_KEY);
-  let isAdmin = false;
+  let calDate = '';
+  let calColor = '';          // default colour of the calendar
+  let dayEvents = [];         // events of the sheet date (already filtered)
+  let hiddenCount = 0;
 
-  // Staff: every field is read-only except Time in / Time out
-  // PP / OS: only filled from the calendar of the selected date (nobody types it)
-  function applyRole() {
+  // event linked to each row (copy kept inside the saved sheet)
+  let rowEvents = new Array(ROWS).fill(null);
 
-    document.body.classList.toggle('staff', !isAdmin);
 
-    document.querySelectorAll('main input, main select').forEach(el => {
-      const field = el.dataset.field;
-      const isTime = field === 'timeIn' || field === 'timeOut';
-      el.disabled = (!isAdmin && !isTime) || field === 'kind';
+  // Events that never show: "1 van", "2 vans", no title, two-letter initials
+  function isIgnored(ev) {
+    const t = (ev.title || '').trim();
+    if (!t || /^\(no title\)$/i.test(t)) return true;
+    if (/^\d+\s*vans?$/i.test(t)) return true;
+    if (/^\p{L}\.?\s*\p{L}\.?$/u.test(t)) return true;
+    return false;
+  }
+
+
+  function colorOf(ev) {
+    if (EVENT_COLORS[ev.colorId]) {
+      const [name, hex] = EVENT_COLORS[ev.colorId];
+      return { name, hex };
+    }
+    const hex = safeHex(calColor);
+    return { name: hueName(hex), hex };
+  }
+
+
+  function sheetIsoDate() {
+
+    const d = $('date-day').value;
+    const m = $('date-month').value;
+    const y = $('date-year').value;
+
+    if (!d || !m || !y) return '';
+
+    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
+  }
+
+
+  function numbersOnSheet() {
+
+    const set = new Set();
+
+    for (let i = 0; i < ROWS; i++) {
+      const num = field(i, 'number').value.trim();
+      if (num) set.add(field(i, 'kind').value + ':' + num);
+    }
+
+    return set;
+
+  }
+
+
+  function snapshot(ev) {
+    const c = colorOf(ev);
+    return {
+      date: ev.date, start: ev.start, end: ev.end, allDay: !!ev.allDay,
+      title: ev.title, location: ev.location, description: ev.description || '',
+      kind: ev.kind, number: ev.number, colorName: c.name, colorHex: c.hex
+    };
+  }
+
+
+  // =========================================
+  // FIRST COLUMN: card shortcut
+  // =========================================
+
+  // Match the row's PP / OS with an event of the sheet date
+  function linkRow(i) {
+
+    const kind = field(i, 'kind').value;
+    const num = field(i, 'number').value.trim();
+
+    if (!num) {
+      rowEvents[i] = null;
+    } else {
+      const live = dayEvents.find(ev => ev.number === num && ev.kind === kind);
+      const kept = rowEvents[i];
+      if (live) {
+        rowEvents[i] = snapshot(live);
+      } else if (!(kept && kept.kind === kind && kept.number === num && kept.date === sheetIsoDate())) {
+        rowEvents[i] = null;
+      }
+    }
+
+    renderCardCell(i);
+
+  }
+
+
+  function linkAllRows() {
+    for (let i = 0; i < ROWS; i++) linkRow(i);
+  }
+
+
+  function renderCardCell(i) {
+
+    const cell = $('card-' + i);
+    const ev = rowEvents[i];
+    const num = field(i, 'number').value.trim();
+
+    if (ev) {
+      cell.innerHTML = `
+        <button type="button" class="card-link" data-card="${i}" style="--c:${safeHex(ev.colorHex)}" title="Open details">
+          <span class="cl-time">${escapeHtml(timeLabel(ev))}</span>
+          <span class="cl-title">${escapeHtml(ev.title)}</span>
+          ${ev.location ? `<span class="cl-loc">${escapeHtml(ev.location)}</span>` : ''}
+        </button>`;
+    } else if (num) {
+      cell.innerHTML = '<span class="no-event">No calendar event for this PP / OS</span>';
+    } else {
+      cell.innerHTML = '';
+    }
+
+  }
+
+
+  function openCard(i) {
+
+    const ev = rowEvents[i];
+    if (!ev) return;
+
+    const [y, m, d] = (ev.date || '').split('-').map(Number);
+    const dateText = y
+      ? `${WEEKDAYS[(new Date(y, m - 1, d).getDay() + 6) % 7]} ${ordinal(d)} ${MONTHS[m - 1]} ${y}`
+      : '';
+
+    $('cm-box').style.setProperty('--c', safeHex(ev.colorHex));
+    $('cm-color').textContent = ev.colorName || '';
+    $('cm-ref').textContent = `${ev.kind} ${ev.number}`;
+    $('cm-when').textContent = [dateText, timeLabel(ev)].filter(Boolean).join(' · ');
+    $('cm-title').textContent = ev.title || '';
+
+    $('cm-loc-block').classList.toggle('hidden', !ev.location);
+    $('cm-loc').textContent = ev.location || '';
+    $('cm-map').href = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(ev.location || '');
+
+    const desc = descriptionText(ev.description);
+    $('cm-desc-block').classList.toggle('hidden', !desc);
+    $('cm-desc').innerHTML = linkify(escapeHtml(desc));
+
+    $('card-modal').classList.remove('hidden');
+    $('cm-close').focus();
+
+  }
+
+
+  function closeCard() {
+    $('card-modal').classList.add('hidden');
+  }
+
+
+  // =========================================
+  // GOOGLE CALENDAR PANEL (one list per colour)
+  // =========================================
+
+  function renderCalendar(syncedAt) {
+
+    const body = $('cal-body');
+
+    if (syncedAt !== undefined) {
+      $('cal-synced').textContent = syncedAt
+        ? 'Calendar synced ' + new Date(syncedAt).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })
+        : 'Calendar never synced yet';
+    }
+
+    if (!calDate) {
+      $('cal-summary').textContent = '– choose a date';
+      body.innerHTML = '<div class="muted">Pick the date of the sheet to see that day\'s calendar events.</div>';
+      return;
+    }
+
+    $('cal-summary').textContent =
+      `– ${dayEvents.length} event${dayEvents.length === 1 ? '' : 's'} on this day` +
+      (hiddenCount ? ` (${hiddenCount} ignored)` : '');
+
+    if (!dayEvents.length) {
+      body.innerHTML = '<div class="muted">No calendar events for this day.</div>';
+      return;
+    }
+
+    // group by colour
+    const groups = new Map();
+
+    dayEvents.forEach((ev, idx) => {
+      const c = colorOf(ev);
+      const key = c.name;
+      if (!groups.has(key)) groups.set(key, { ...c, items: [] });
+      groups.get(key).items.push(idx);
     });
 
-    $('who').innerHTML = `${escapeHtml(userName)}` +
-      (isAdmin ? '<span class="role-badge">Admin</span>' : '<span class="role-badge badge-hidden">Team</span>');
+    const rank = g => {
+      const r = GROUP_ORDER.indexOf(g.name);
+      return r === -1 ? GROUP_ORDER.length : r;
+    };
+
+    const sorted = [...groups.values()].sort((a, b) => rank(a) - rank(b) || b.items.length - a.items.length);
+
+    const onSheet = numbersOnSheet();
+
+    body.innerHTML = '<div class="cal-groups">' + sorted.map((g, gi) => `
+      <section class="cal-group" style="--c:${safeHex(g.hex)}">
+        <div class="cal-group-head">
+          <span class="dot"></span>
+          <strong>${escapeHtml(g.name)}</strong>
+          <small>${g.items.length} event${g.items.length === 1 ? '' : 's'}</small>
+          <button type="button" class="small" data-select-group="${gi}">Select all</button>
+        </div>
+        <ul data-group="${gi}">
+          ${g.items.map(idx => {
+            const ev = dayEvents[idx];
+            const added = ev.number && onSheet.has(ev.kind + ':' + ev.number);
+            const ref = added
+              ? '<span class="ref">on sheet</span>'
+              : ev.number
+                ? `<span class="ref">${escapeHtml(ev.kind)} ${escapeHtml(ev.number)}</span>`
+                : '<span class="ref none">no PP/OS</span>';
+            return `
+              <li class="${added ? 'added' : ''} ${ev.number ? '' : 'noref'}">
+                <label>
+                  <input type="checkbox" data-cal="${idx}" ${(added || !ev.number) ? 'disabled' : ''} aria-label="Select event">
+                  <span>
+                    <span class="ev-time">${escapeHtml(timeLabel(ev))}</span>
+                    ${escapeHtml(ev.title)}
+                    ${ev.location ? `<span class="ev-loc">${escapeHtml(ev.location)}</span>` : ''}
+                  </span>
+                  ${ref}
+                </label>
+              </li>`;
+          }).join('')}
+        </ul>
+      </section>`).join('') + '</div>';
+
+  }
+
+
+  async function loadCalendar() {
+
+    calDate = sheetIsoDate();
+
+    if (!calDate) {
+      dayEvents = [];
+      hiddenCount = 0;
+      renderCalendar();
+      linkAllRows();
+      return;
+    }
+
+    const asked = calDate;
+
+    try {
+
+      const data = await api('/api/calendar?date=' + asked);
+
+      if (asked !== calDate) return;   // date changed meanwhile
+
+      calColor = data.calendarColor || '';
+
+      const all = data.events || [];
+      dayEvents = all.filter(ev => !isIgnored(ev));
+      hiddenCount = all.length - dayEvents.length;
+
+      renderCalendar(data.syncedAt);
+      linkAllRows();
+
+    } catch (err) {
+
+      $('cal-body').innerHTML = '<div class="muted">Could not load calendar events.</div>';
+
+    }
+
+  }
+
+
+  function addSelectedToSheet() {
+
+    const picked = [...document.querySelectorAll('#cal-body [data-cal]:checked')]
+      .map(box => dayEvents[Number(box.dataset.cal)]);
+
+    if (!picked.length) {
+      setStatus('Tick at least one event', 'err');
+      return;
+    }
+
+    const onSheet = numbersOnSheet();
+    let placed = 0;
+    let noRoom = 0;
+
+    for (const ev of picked) {
+
+      if (!ev.number || onSheet.has(ev.kind + ':' + ev.number)) continue;
+
+      // first row with an empty number box
+      let row = -1;
+      for (let i = 0; i < ROWS; i++) {
+        if (!field(i, 'number').value.trim()) { row = i; break; }
+      }
+
+      if (row === -1) { noRoom++; continue; }
+
+      field(row, 'kind').value = ev.kind || 'PP';
+      field(row, 'number').value = ev.number;
+      linkRow(row);
+
+      onSheet.add(ev.kind + ':' + ev.number);
+      placed++;
+
+    }
+
+    renderCalendar();
+
+    setStatus(
+      `${placed} added from calendar` + (noRoom ? ` · ${noRoom} did not fit (sheet full)` : '') + ' – remember to Save',
+      noRoom ? 'err' : 'ok'
+    );
 
   }
 
@@ -768,8 +1103,6 @@
   // =========================================
 
   let currentId = newId();
-  let currentSaved = false;
-  const dirtyTimes = new Set();
 
   function readForm() {
 
@@ -777,11 +1110,11 @@
 
     for (let i = 0; i < ROWS; i++) {
       rows.push({
-        kind: rowField(i, 'kind').value,
-        number: rowField(i, 'number').value.trim(),
-        timeIn: rowField(i, 'timeIn').value,
-        timeOut: rowField(i, 'timeOut').value,
-        timesDirty: dirtyTimes.has(i)
+        kind: field(i, 'kind').value,
+        number: field(i, 'number').value.trim(),
+        timeIn: field(i, 'timeIn').value,
+        timeOut: field(i, 'timeOut').value,
+        event: rowEvents[i]
       });
     }
 
@@ -797,32 +1130,10 @@
         text: (d && m && y) ? `${ordinal(Number(d))} ${MONTHS[m - 1]} ${y}` : ''
       },
       day: $('weekday').value,
-      message: $('message').value.trim(),
-      team: [$('team-1').value.trim(), $('team-2').value.trim()],
-      vans: {
-        v1: $('van-1').checked,
-        v2: $('van-2').checked,
-        v3: $('van-3').checked,
-        v3Plate: $('van-3-plate').value.trim()
-      },
       rows,
       signOut: $('sign-out').value.trim(),
       signIn: $('sign-in').value.trim()
     };
-
-  }
-
-
-  function writeRow(i, row) {
-
-    rowField(i, 'kind').value = row.kind || 'PP';
-    rowField(i, 'number').value = row.number || '';
-    rowField(i, 'timeIn').value = row.timeIn || '';
-    rowField(i, 'timeOut').value = row.timeOut || '';
-
-    rowField(i, 'by').textContent = row.timeBy && row.timeAt && (row.timeIn || row.timeOut)
-      ? `${row.timeBy} · ${new Date(row.timeAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
-      : '';
 
   }
 
@@ -837,26 +1148,21 @@
     $('date-day').value = date.day || '';
 
     $('weekday').value = sheet.day || '';
-    $('message').value = sheet.message || '';
-    $('team-1').value = (sheet.team || [])[0] || '';
-    $('team-2').value = (sheet.team || [])[1] || '';
-
-    const vans = sheet.vans || {};
-    $('van-1').checked = !!vans.v1;
-    $('van-2').checked = !!vans.v2;
-    $('van-3').checked = !!vans.v3;
-    $('van-3-plate').value = vans.v3Plate || '';
 
     const rows = sheet.rows || [];
 
-    for (let i = 0; i < ROWS; i++) writeRow(i, rows[i] || {});
+    for (let i = 0; i < ROWS; i++) {
+      const row = rows[i] || {};
+      field(i, 'kind').value = row.kind || 'PP';
+      field(i, 'number').value = row.number || '';
+      field(i, 'timeIn').value = row.timeIn || '';
+      field(i, 'timeOut').value = row.timeOut || '';
+      rowEvents[i] = row.event || null;
+      renderCardCell(i);
+    }
 
     $('sign-out').value = sheet.signOut || '';
     $('sign-in').value = sheet.signIn || '';
-
-    dirtyTimes.clear();
-
-    markInvalid([]);
 
   }
 
@@ -865,6 +1171,8 @@
   // API
   // =========================================
 
+  let userName = safeGet(NAME_KEY);
+
   async function api(path, options = {}) {
 
     const res = await fetch(path, {
@@ -872,7 +1180,6 @@
       headers: {
         'content-type': 'application/json',
         'x-user-name': encodeURIComponent(userName),
-        ...(adminToken ? { 'x-admin-token': adminToken } : {}),
         ...(options.headers || {})
       }
     });
@@ -884,30 +1191,24 @@
   }
 
 
-  let sheetList = [];
-
   async function loadList() {
 
     try {
 
-      sheetList = await api('/api/sheets');
+      const list = await api('/api/sheets');
 
-      $('saved-count').textContent = sheetList.length;
+      $('saved-count').textContent = list.length;
 
-      $('saved-list').innerHTML = sheetList.map(s => `
+      $('saved-list').innerHTML = list.map(s => `
         <li>
           <span>
             <strong>${escapeHtml(s.date?.text || 'No date')}</strong>
             ${s.day ? '· ' + escapeHtml(s.day) : ''}
-            ${(s.team || []).filter(Boolean).length ? '· ' + escapeHtml(s.team.filter(Boolean).join(', ')) : ''}
-            ${isAdmin ? `<span class="role-badge ${s.visible ? 'badge-visible' : 'badge-hidden'}">${s.visible ? 'Visible to team' : 'Hidden'}</span>` : ''}
             <br><small>Last saved by ${escapeHtml(s.updatedBy)} · ${new Date(s.updatedAt).toLocaleString('en-GB')}</small>
           </span>
           <button type="button" data-open="${escapeHtml(s.id)}">Open</button>
-          ${isAdmin ? `
-            <button type="button" data-visible="${escapeHtml(s.id)}" data-to="${s.visible ? '0' : '1'}">${s.visible ? 'Hide' : 'Show to team'}</button>
-            <button type="button" class="danger" data-delete="${escapeHtml(s.id)}">Delete</button>` : ''}
-        </li>`).join('') || `<li><span><small>${isAdmin ? 'No saved sheets yet.' : 'No sheet available.'}</small></span></li>`;
+          <button type="button" class="danger" data-delete="${escapeHtml(s.id)}">Delete</button>
+        </li>`).join('') || '<li><span><small>No saved sheets yet.</small></span></li>';
 
     } catch (err) {
 
@@ -918,34 +1219,18 @@
   }
 
 
-  // ---------- ADMIN: save whole sheet ----------
-
   async function save() {
-
-    const bad = invalidRows();
-
-    markInvalid(bad);
-
-    if (bad.length) {
-      setStatus(`Row(s) ${bad.map(i => i + 1).join(', ')} are not in this day's calendar — clear them (×) first`, 'err');
-      return;
-    }
 
     setStatus('Saving…');
 
     try {
 
-      const sheet = await api('/api/sheets/' + currentId, {
+      await api('/api/sheets/' + currentId, {
         method: 'PUT',
         body: JSON.stringify(readForm())
       });
 
-      // Shows times the team may have entered meanwhile
-      writeForm(sheet);
-
-      currentSaved = true;
-
-      setStatus('Saved ' + timeNow(), 'ok');
+      setStatus('Saved ' + new Date().toLocaleTimeString('en-GB'), 'ok');
 
       loadList();
 
@@ -958,59 +1243,7 @@
   }
 
 
-  // ---------- TEAM: each time change is saved at once ----------
-
-  async function saveTimes(i) {
-
-    setStatus('Saving…');
-
-    try {
-
-      const sheet = await api(`/api/sheets/${currentId}/times`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          row: i,
-          timeIn: rowField(i, 'timeIn').value,
-          timeOut: rowField(i, 'timeOut').value
-        })
-      });
-
-      writeRow(i, sheet.rows[i] || {});
-
-      setStatus('Saved ' + timeNow(), 'ok');
-
-    } catch (err) {
-
-      setStatus('Save failed: ' + err.message, 'err');
-
-    }
-
-  }
-
-
-  async function setVisible(id, visible) {
-
-    try {
-
-      await api(`/api/sheets/${id}/visibility`, {
-        method: 'POST',
-        body: JSON.stringify({ visible })
-      });
-
-      setStatus(visible ? 'Visible to team' : 'Hidden from team', 'ok');
-
-      loadList();
-
-    } catch (err) {
-
-      setStatus('Failed: ' + err.message, 'err');
-
-    }
-
-  }
-
-
-  async function openSheet(id, quiet) {
+  async function openSheet(id) {
 
     try {
 
@@ -1018,18 +1251,13 @@
 
       currentId = sheet.id;
 
-      currentSaved = true;
-
       writeForm(sheet);
 
-      renderCalendar();
+      loadCalendar();
 
-      showSheet(true);
+      setStatus('Opened', 'ok');
 
-      if (!quiet) {
-        setStatus('Opened', 'ok');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
 
     } catch (err) {
 
@@ -1065,274 +1293,11 @@
 
     currentId = newId();
 
-    currentSaved = false;
-
-    writeForm({ date: todayDate() });
-
-    suggestWeekday();
-
-    renderCalendar();
-
-    setStatus('');
-
-  }
-
-
-  function showSheet(show) {
-
-    document.querySelector('main').classList.toggle('hidden', !show);
-
-    $('empty-staff').classList.toggle('hidden', show);
-
-  }
-
-
-  // =========================================
-  // CALENDAR (admin)
-  //
-  // Loaded when the page opens and when Refresh is clicked.
-  // Changing the date filters what is already loaded.
-  // =========================================
-
-  let calendars = [];
-  let calendarLoaded = false;
-  let calendarRange = { from: '', to: '' };
-
-  function todayDate() {
-    const [y, m, d] = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Dublin' })
-      .format(new Date()).split('-');
-    return { day: String(Number(d)), month: String(Number(m)), year: y };
-  }
-
-  function selectedIso() {
-    const d = $('date-day').value, m = $('date-month').value, y = $('date-year').value;
-    if (!d || !m || !y) return '';
-    return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-  }
-
-  // PP / OS numbers found in an event
-  function extractRefs(ev) {
-    const text = `${ev.title} ${ev.description} ${ev.location}`;
-    const refs = [];
-    const re = /\b(PP|OS)\s*[-:#.]?\s*(\d{3,})/gi;
-    let m;
-    while ((m = re.exec(text))) {
-      const ref = { kind: m[1].toUpperCase(), number: m[2] };
-      if (!refs.some(r => r.kind === ref.kind && r.number === ref.number)) refs.push(ref);
-    }
-    return refs;
-  }
-
-  // Events of the selected date, calendar priority first, then by time
-  function calendarEventsForDate() {
-    const iso = selectedIso();
-    if (!iso) return [];
-    const list = [];
-    calendars.forEach((cal, priority) => {
-      for (const ev of cal.events || []) {
-        if (ev.date === iso) list.push({ ...ev, calendar: cal.name, color: cal.color, priority });
-      }
-    });
-    return list.sort((a, b) =>
-      a.priority - b.priority || (a.start || '').localeCompare(b.start || ''));
-  }
-
-  let needsChoice = new Set();
-
-  function renderCalendar() {
-
-    if (!isAdmin) return;
-
-    const iso = selectedIso();
-
-    $('cal-date').textContent = iso
-      ? new Date(iso + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-      : 'select a date';
-
-    $('cal-legend').innerHTML = calendars.map(c =>
-      `<span style="--c:${escapeHtml(c.color)}" class="${c.error ? 'err' : ''}">${escapeHtml(c.name)}${c.error ? ' — ' + escapeHtml(c.error) : ''}</span>`
-    ).join('');
-
-    const events = calendarEventsForDate();
-
-    $('cal-events').innerHTML = events.map((ev, i) => {
-
-      const refs = extractRefs(ev);
-      const when = ev.start ? ev.start + (ev.end ? '–' + ev.end : '') : 'All day';
-
-      // One button per PP / OS found, so only the chosen one is used
-      const picks = refs.length
-        ? refs.map((r, j) => `<button type="button" data-ev="${i}" data-ref="${j}">Add ${escapeHtml(r.kind + ' ' + r.number)}</button>`).join('')
-        : '<span class="none">No PP / OS number</span>';
-
-      return `
-        <li style="--c:${escapeHtml(ev.color)}" class="${needsChoice.has(i) ? 'choose' : ''}">
-          <span class="when">${escapeHtml(when)}</span>
-          <span class="what">
-            ${escapeHtml(ev.title)}
-            <small>${escapeHtml(ev.calendar)}${ev.location ? ' · ' + escapeHtml(ev.location) : ''}${refs.length > 1 ? ' · choose PP or OS' : ''}</small>
-          </span>
-          <span class="picks">${picks}</span>
-        </li>`;
-
-    }).join('') || `<li class="empty">${iso ? 'No events for this date.' : ''}</li>`;
-
-  }
-
-  async function loadCalendar() {
-
-    if (!isAdmin) return;
-
-    try {
-
-      const data = await api('/api/calendar');
-
-      calendars = data.calendars || [];
-
-      calendarLoaded = calendars.some(c => !c.error);
-
-      calendarRange = { from: data.from || '', to: data.to || '' };
-
-      const when = data.syncedAt ? new Date(data.syncedAt) : new Date();
-
-      $('cal-updated').textContent = (data.syncedAt ? 'synced from Google ' : 'updated ') +
-        when.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-
-    } catch (err) {
-
-      $('cal-updated').textContent = 'calendar unavailable';
-
-    }
-
-    needsChoice = new Set();
-
-    renderCalendar();
-
-  }
-
-  function rowHasRef(kind, number) {
-    for (let i = 0; i < ROWS; i++) {
-      if (rowField(i, 'kind').value === kind && rowField(i, 'number').value.trim() === number) return true;
-    }
-    return false;
-  }
-
-  function nextEmptyRow() {
-    for (let i = 0; i < ROWS; i++) {
-      if (!rowField(i, 'number').value.trim()) return i;
-    }
-    return -1;
-  }
-
-  // Puts one PP or OS number in the next empty row
-  function addRef(ref) {
-
-    if (rowHasRef(ref.kind, ref.number)) {
-      setStatus(`${ref.kind} ${ref.number} is already on the sheet`);
-      return 0;
-    }
-
-    const i = nextEmptyRow();
-
-    if (i < 0) {
-      setStatus('Sheet is full (9 rows)', 'err');
-      return 0;
-    }
-
-    rowField(i, 'kind').value = ref.kind;
-    rowField(i, 'number').value = ref.number;
-
-    setStatus(`Added ${ref.kind} ${ref.number} — remember to Save`, 'ok');
-
-    return 1;
-
-  }
-
-  // Events with a single PP / OS are added; events with both are left for you to choose
-  function fillFromCalendar() {
-
-    let added = 0;
-
-    needsChoice = new Set();
-
-    calendarEventsForDate().forEach((ev, i) => {
-      const refs = extractRefs(ev);
-      if (refs.length === 1) added += addRef(refs[0]) ? 1 : 0;
-      if (refs.length > 1) needsChoice.add(i);
-    });
-
-    renderCalendar();
-
-    const parts = [];
-    if (added) parts.push(`Added ${added}`);
-    if (needsChoice.size) parts.push(`${needsChoice.size} event(s): choose PP or OS`);
-
-    setStatus(parts.join(' · ') || 'Nothing new to add', added ? 'ok' : '');
-
-  }
-
-
-  // PP / OS allowed on the selected date = the ones in that day's events
-  function allowedRefs() {
-    const set = new Set();
-    for (const ev of calendarEventsForDate()) {
-      for (const r of extractRefs(ev)) set.add(r.kind + ' ' + r.number);
-    }
-    return set;
-  }
-
-  // Can we check this date? (calendar loaded and date inside the synced period)
-  function canCheckDate() {
-    const iso = selectedIso();
-    return isAdmin && calendarLoaded && iso &&
-      (!calendarRange.from || iso >= calendarRange.from) &&
-      (!calendarRange.to || iso <= calendarRange.to);
-  }
-
-  function invalidRows() {
-    if (!canCheckDate()) return [];
-    const allowed = allowedRefs();
-    const bad = [];
-    for (let i = 0; i < ROWS; i++) {
-      const number = rowField(i, 'number').value.trim();
-      if (number && !allowed.has(rowField(i, 'kind').value + ' ' + number)) bad.push(i);
-    }
-    return bad;
-  }
-
-  function markInvalid(bad) {
-    document.querySelectorAll('#rows tr').forEach((tr, i) => tr.classList.toggle('invalid', bad.includes(i)));
-  }
-
-  function clearRow(i) {
-    writeRow(i, {});
-    dirtyTimes.add(i);
-  }
-
-  // Date changed: drop the rows that are not in the new day's events
-  function pruneRowsForDate() {
-    const bad = invalidRows();
-    bad.forEach(clearRow);
-    markInvalid([]);
-    if (bad.length) setStatus(`Removed ${bad.length} item(s) not in this day's calendar — remember to Save`, 'err');
-  }
-
-
-  function refreshAll() {
-
-    loadList().then(() => {
-
-      if (isAdmin) return;
-
-      // Team: keep the open sheet if still visible, otherwise open the first one
-      const stillThere = sheetList.some(s => s.id === currentId);
-
-      if (sheetList.length) openSheet(stillThere ? currentId : sheetList[0].id, true);
-      else showSheet(false);
-
-    });
+    writeForm({});
 
     loadCalendar();
+
+    setStatus('');
 
   }
 
@@ -1345,76 +1310,26 @@
 
     $('gate').classList.remove('hidden');
     $('gate-name').value = userName;
-    $('gate-pass').value = '';
-    $('gate-error').textContent = '';
-    $('gate-pass-wrap').classList.toggle('hidden', !adminToken);
     $('gate-name').focus();
 
   }
 
 
-  async function enter(name, password) {
+  async function enter(name) {
 
     userName = name;
 
     safeSet(NAME_KEY, name);
 
-    $('gate-error').textContent = '';
-
-    if (password) {
-
-      try {
-
-        const res = await api('/api/admin/login', {
-          method: 'POST',
-          body: JSON.stringify({ password })
-        });
-
-        adminToken = res.token;
-
-      } catch (err) {
-
-        $('gate-error').textContent = err.message;
-
-        return;
-
-      }
-
-    } else if ($('gate-pass-wrap').classList.contains('hidden')) {
-
-      // Entering as team drops any admin session on this device
-      adminToken = '';
-
-    }
-
-    try {
-
-      isAdmin = adminToken ? (await api('/api/me')).admin : false;
-
-    } catch {
-
-      isAdmin = false;
-
-    }
-
-    if (!isAdmin) adminToken = '';
-
-    safeSet(ADMIN_KEY, adminToken);
+    $('who').innerHTML = `${escapeHtml(name)} <small>signed in</small>`;
 
     $('gate').classList.add('hidden');
 
-    applyRole();
-
     try { await api('/api/hello', { method: 'POST' }); } catch {}
 
-    $('saved-details').open = !isAdmin;
+    loadList();
 
-    if (isAdmin) {
-      showSheet(true);
-      if (!currentSaved) newSheet();
-    }
-
-    refreshAll();
+    if (sheetIsoDate()) loadCalendar();
 
   }
 
@@ -1426,75 +1341,59 @@
   $('gate-form').addEventListener('submit', e => {
     e.preventDefault();
     const name = $('gate-name').value.trim();
-    if (name) enter(name, $('gate-pass').value);
-  });
-
-  $('gate-admin-toggle').addEventListener('click', () => {
-    const wrap = $('gate-pass-wrap');
-    wrap.classList.toggle('hidden');
-    if (wrap.classList.contains('hidden')) $('gate-pass').value = '';
-    else $('gate-pass').focus();
+    if (name) enter(name);
   });
 
   $('change-user').addEventListener('click', showGate);
 
-  function dateChanged() {
-    suggestWeekday();
-    needsChoice = new Set();
-    renderCalendar();
-    pruneRowsForDate();
-  }
-
-  $('date-month').addEventListener('change', () => { refreshDays(); dateChanged(); });
-  $('date-year').addEventListener('change', () => { refreshDays(); dateChanged(); });
-  $('date-day').addEventListener('change', dateChanged);
-
-  // Time dropdowns: team saves at once, admin marks the row and saves with Save
-  $('rows').addEventListener('click', e => {
-    const btn = e.target.closest('[data-clear]');
-    if (!btn || !isAdmin) return;
-    clearRow(Number(btn.dataset.clear));
-    markInvalid(invalidRows());
-    setStatus('Row cleared — remember to Save');
-  });
-
-  $('rows').addEventListener('change', e => {
-    const field = e.target.dataset.field;
-    if (field !== 'timeIn' && field !== 'timeOut') return;
-    const i = Number(e.target.dataset.row);
-    if (isAdmin) dirtyTimes.add(i);
-    else saveTimes(i);
-  });
+  $('date-month').addEventListener('change', () => { refreshDays(); suggestWeekday(); loadCalendar(); });
+  $('date-year').addEventListener('change', () => { refreshDays(); suggestWeekday(); loadCalendar(); });
+  $('date-day').addEventListener('change', () => { suggestWeekday(); loadCalendar(); });
 
   $('btn-save').addEventListener('click', save);
-  $('btn-refresh').addEventListener('click', refreshAll);
-  $('btn-fill').addEventListener('click', fillFromCalendar);
-
   $('btn-new').addEventListener('click', () => {
     if (confirm('Start a new blank sheet? Unsaved changes will be lost.')) newSheet();
   });
-
-  $('cal-events').addEventListener('click', e => {
-    const btn = e.target.closest('[data-ev]');
-    if (!btn) return;
-    const i = Number(btn.dataset.ev);
-    const ev = calendarEventsForDate()[i];
-    if (!ev) return;
-    const ref = extractRefs(ev)[Number(btn.dataset.ref)];
-    if (ref && addRef(ref)) {
-      needsChoice.delete(i);
-      renderCalendar();
-    }
-  });
+  $('btn-print').addEventListener('click', () => window.print());
 
   $('saved-list').addEventListener('click', e => {
     const open = e.target.closest('[data-open]');
     const del = e.target.closest('[data-delete]');
-    const vis = e.target.closest('[data-visible]');
     if (open) openSheet(open.dataset.open);
     if (del) deleteSheet(del.dataset.delete);
-    if (vis) setVisible(vis.dataset.visible, vis.dataset.to === '1');
   });
+
+  // calendar panel
+  $('cal-refresh').addEventListener('click', loadCalendar);
+  $('cal-add').addEventListener('click', addSelectedToSheet);
+  $('cal-body').addEventListener('click', e => {
+    const btn = e.target.closest('[data-select-group]');
+    if (!btn) return;
+    document
+      .querySelectorAll(`#cal-body ul[data-group="${btn.dataset.selectGroup}"] [data-cal]:not(:disabled)`)
+      .forEach(box => { box.checked = true; });
+  });
+
+  // rows: PP / OS typed or changed -> relink the card
+  function onRowEdit(e) {
+    const t = e.target;
+    if (t.dataset.field !== 'number' && t.dataset.field !== 'kind') return;
+    linkRow(Number(t.dataset.row));
+    if (calDate) renderCalendar();
+  }
+
+  $('rows').addEventListener('input', onRowEdit);
+  $('rows').addEventListener('change', onRowEdit);
+
+  $('rows').addEventListener('click', e => {
+    const card = e.target.closest('[data-card]');
+    if (card) openCard(Number(card.dataset.card));
+  });
+
+  // card modal
+  $('cm-close').addEventListener('click', closeCard);
+  $('card-modal').addEventListener('click', e => { if (e.target === $('card-modal')) closeCard(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCard(); });
 
 
   // =========================================
@@ -1503,7 +1402,6 @@
 
   buildHeader();
   buildRows();
-  showSheet(false);
 
   // Name is asked on every page load (pre-filled with the last one used)
   showGate();
