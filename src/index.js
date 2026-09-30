@@ -151,8 +151,9 @@ function cleanPlan(plan) {
 // Short summary of a sheet for the list
 function summary(sheet) {
 
+  // deliveries only (the lunch break is not a delivery)
   const rows =
-    (sheet.rows || []).filter(r => r.key);
+    (sheet.rows || []).filter(r => r.key && !(r.event && r.event.lunch));
 
   return {
     id: sheet.id,
