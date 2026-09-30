@@ -27,6 +27,14 @@ Digital delivery sheet fed by Google Calendar, served by a Cloudflare Worker.
 - Admin: appears as soon as a date and a route are chosen (from the calendar, before filling the
   sheet), then follows the rows of the sheet.
 - Team: the route saved with the sheet (the admin's last Save).
+- Schedule: every route leaves the warehouse at 09:30 (DEPART_TIME in public/index.html);
+  calendar times are not used. For each stop: drive → arrive → delivery time → leave → next drive.
+  Delivery time = the Delivery duration chosen, otherwise the planned time (calendar event length).
+- Lunch: option in the PP / OS dropdown (once per sheet), adds 30 minutes at that point, no driving.
+- Places are looked up preferring the Dublin / Leinster area (AREA_PREFERIDA in the Apps Script),
+  so "Blackrock" is Blackrock, Co. Dublin, not Cork.
+- Driving times shown = Google Maps time + 15 min margin, rounded up to the next 15 min
+  (18 → 45 min, 30 → 45 min, 35 → 1 h). Change DRIVE_MARGIN / DRIVE_ROUND in public/index.html.
 - Warehouse A94 HX83 (`ARMAZEM` in the Apps Script) is the start and the end of every route.
 - The map uses Leaflet + OpenStreetMap, loaded by the browser only when a preview is shown:
   no extra Cloudflare requests. Road paths and coordinates come from the Apps Script.
