@@ -350,6 +350,7 @@
   }
 
   .card-link:hover { background: #f1f5fb; }
+  .card-link.lunch { border-left-color: #8a8f98; background: #f4f5f7; cursor: default; }
 
   .card-link .cl-time { font-weight: 700; }
   .card-link .cl-title,
@@ -859,6 +860,18 @@
 
   const MANUAL = '__manual';
 
+  // Driving time margin: Google Maps time + 15 min, rounded UP to the next 15 min
+  // (addresses are only the area from the title, so Maps times are approximate)
+  const DRIVE_MARGIN = 15;
+  const DRIVE_ROUND = 15;
+
+  // Every route leaves the warehouse at this time (calendar times are not used)
+  const DEPART_TIME = '09:30';
+
+  // Lunch: option in the PP / OS dropdown, adds this many minutes to the route
+  const LUNCH_KEY = 'LUNCH';
+  const LUNCH_MIN = 30;
+
   const NAME_KEY = 'route-plan:name';
   const TOKEN_KEY = 'route-plan:admin-token';
 
@@ -1064,8 +1077,15 @@
     return out;
   }
 
-  // Driving legs + warehouse to use: live calendar (admin) or the copy saved with the sheet
-  function legsSource() {
+  // 18 min -> 18 + 15 = 33 -> 45 min
+  function withMargin(minutes) {
+    if (minutes === null || minutes === undefined) return null;
+    return Math.ceil((minutes + DRIVE_MARGIN) / DRIVE_ROUND) * DRIVE_ROUND;
+  }
+
+  // Driving legs + warehouse as Google Maps gave them:
+  // live calendar (admin) or the copy saved with the sheet
+  function rawLegsSource() {
     const saved = sheetPlan || {};
     if (isAdmin) {
       return {
@@ -1076,12 +1096,69 @@
     return { legs: saved.legs || {}, wh: saved.warehouse || '' };
   }
 
+  // Same legs with the margin applied (used for every time shown / added up)
+  function legsSource() {
+    const { legs, wh } = rawLegsSource();
+    const out = {};
+    for (const [k, l] of Object.entries(legs)) {
+      out[k] = l && l.minutes !== null && l.minutes !== undefined
+        ? { ...l, minutes: withMargin(l.minutes), maps: l.minutes }
+        : l;
+    }
+    return { legs: out, wh };
+  }
+
+  // tooltip: where the number comes from
+  function marginTitle(leg) {
+    return leg && leg.maps !== undefined
+      ? ` title="Google Maps ${leg.maps} min + ${DRIVE_MARGIN} min margin, rounded up to ${DRIVE_ROUND} min"`
+      : '';
+  }
+
+  // Place for Google Maps. Same rule as lugar_() in the Apps Script (keep them equal,
+  // the driving times are stored under these exact texts):
+  //   1. Location field  2. full Eircode in title / description
+  //   3. area at the start of the title: "D04 pp26159 ..." -> "Dublin 4, Ireland",
+  //                                      "Bray pp185 ..."  -> "Bray, Ireland"
+  function placeFromEvent(ev) {
+
+    if (!ev) return '';
+
+    const loc = String(ev.location || '').trim();
+    if (loc) return loc;
+
+    const title = String(ev.title || '');
+    const desc = String(ev.description || '').replace(/<[^>]+>/g, ' ');
+
+    const eircode = (title + ' ' + desc).match(/\b([AC-FHKNPRTV-Y]\d{2}|D6W)\s?[0-9AC-FHKNPRTV-Y]{4}\b/i);
+    if (eircode) return eircode[0].toUpperCase() + ', Ireland';
+
+    const area = title
+      .split(/\b(?:PP|OS)\s*[-:#.]?\s*\d/i)[0]
+      .replace(/[\s,\-–:]+$/, '')
+      .trim();
+
+    if (!area || /^\d+\s*vans?$/i.test(area)) return '';
+
+    const dublin = area.match(/^D\s?0?(\d{1,2})(W)?$/i);
+    if (dublin) return 'Dublin ' + Number(dublin[1]) + (dublin[2] ? 'W' : '') + ', Ireland';
+
+    return area + ', Ireland';
+
+  }
+
   function mapsPlace(ev) {
-    return (ev && (ev.location || ev.place)) || '';
+    if (!ev || ev.lunch) return '';
+    return ev.place || placeFromEvent(ev) || '';
+  }
+
+  function lunchEvent() {
+    return { lunch: true, title: 'Lunch', minutes: LUNCH_MIN };
   }
 
   // Text of a sheet row: PP / OS list, or the event title
   function rowRefText(row) {
+    if (row.event && row.event.lunch) return 'Lunch';
     if (row.event && row.event.refs && row.event.refs.length) return refsText(row.event.refs);
     if (row.number) return `${row.kind} ${row.number}`;
     return row.event ? '—' : '';
@@ -1168,6 +1245,7 @@
 
 
   function rowKey(i) {
+    if (rowEvents[i] && rowEvents[i].lunch) return LUNCH_KEY;
     const num = field(i, 'number').value.trim();
     if (num) return field(i, 'kind').value + ':' + num;
     const ev = rowEvents[i];
@@ -1341,7 +1419,10 @@
       .forEach(el => { el.disabled = !adminEdit; });
 
     document.querySelectorAll('[data-field=duration]')
-      .forEach(el => { el.disabled = !isAdmin || closed || !rowKey(Number(el.dataset.row)); });
+      .forEach(el => {
+        const r = Number(el.dataset.row);
+        el.disabled = !isAdmin || closed || !rowKey(r) || !!(rowEvents[r] && rowEvents[r].lunch);
+      });
 
     $('btn-close').textContent = closed ? 'Reopen day' : 'Close day';
     $('btn-close').disabled = !sheetSaved;
@@ -1418,7 +1499,7 @@
     }
 
     // current value from another route / not in calendar any more
-    if (key && !seen.has(key) && rowEvents[i]) {
+    if (key && key !== LUNCH_KEY && !seen.has(key) && rowEvents[i]) {
       opts.unshift(`<option value="${escapeHtml(key)}">${escapeHtml(optionLabel(rowEvents[i]))}</option>`);
       seen.add(key);
     }
@@ -1427,9 +1508,13 @@
       : !route ? 'Choose a route first'
       : 'Select PP / OS';
 
+    seen.add(LUNCH_KEY);
+    const lunchTaken = used.has(LUNCH_KEY) && key !== LUNCH_KEY;
+
     sel.innerHTML =
       `<option value="">${placeholder}</option>` +
       opts.join('') +
+      `<option value="${LUNCH_KEY}" ${lunchTaken ? 'disabled' : ''}>🍽 Lunch (${LUNCH_MIN} min)${lunchTaken ? ' (on sheet)' : ''}</option>` +
       `<option value="${MANUAL}">Other – type number…</option>`;
 
     const manual = manualMode[i] || (key && !seen.has(key));
@@ -1455,61 +1540,111 @@
   }
 
 
-  // Driving time for each row, in sheet order (admin)
+  // Route schedule: leave the warehouse at DEPART_TIME, then for every stop
+  //   drive (Maps + margin) -> arrive -> delivery time -> leave -> next drive ...
+  // Delivery time = the Delivery duration chosen, or the planned time (calendar event length).
+  // Lunch = LUNCH_MIN minutes, no driving.
+  let schedule = null;
+
+  function buildSchedule(stops) {
+
+    const { legs, wh } = legsSource();
+
+    let t = toMin(DEPART_TIME);
+    let prevPlace = wh || null;
+    let prevLabel = 'from warehouse';
+    let uncertain = false;
+    let totalDrive = 0, km = 0, missing = 0, service = 0;
+
+    const items = stops.map((s, k) => {
+
+      const ev = s.ev;
+
+      if (ev.lunch) {
+        const item = { ...s, lunch: true, arrive: t, leave: t + LUNCH_MIN, service: LUNCH_MIN, uncertain };
+        t += LUNCH_MIN;
+        return item;
+      }
+
+      const place = mapsPlace(ev);
+      let leg = null, label = null;
+
+      if (!place) {
+        uncertain = true;
+      } else if (prevPlace) {
+        label = prevLabel;
+        leg = legs[prevPlace + '→' + place] || null;
+        if (leg && leg.minutes !== null) { t += leg.minutes; totalDrive += leg.minutes; km += leg.km || 0; }
+        else { missing++; uncertain = true; }
+      }
+
+      const arrive = t;
+      const d = s.row >= 0 ? rowDur[s.row] : null;
+      const planned = plannedOf(ev);
+      const mins = d && d.duration ? d.duration : planned;
+
+      if (!mins) uncertain = true;
+      t += mins || 0;
+      service += mins || 0;
+
+      const item = {
+        ...s, place, leg, label, noPlace: !place,
+        arrive, leave: t, service: mins, serviceFrom: d && d.duration ? 'real' : 'planned',
+        planned, uncertain
+      };
+
+      if (place) { prevPlace = place; prevLabel = 'from previous'; }
+
+      return item;
+
+    });
+
+    // back to the warehouse
+    let backLeg = null, back = null;
+
+    if (wh && prevPlace && prevPlace !== wh) {
+      backLeg = legs[prevPlace + '→' + wh] || null;
+      if (backLeg && backLeg.minutes !== null) {
+        totalDrive += backLeg.minutes; km += backLeg.km || 0;
+        back = t + backLeg.minutes;
+      } else {
+        missing++;
+      }
+    }
+
+    return {
+      items, wh, depart: toMin(DEPART_TIME), back, backLeg,
+      end: t, totalDrive, km, missing, service, uncertain
+    };
+
+  }
+
+
+  // "~10:15" when an earlier time is unknown
+  function timeRange(item) {
+    const pre = item.uncertain ? '~' : '';
+    return `${pre}${clock(item.arrive)}–${clock(item.leave)}`;
+  }
+
+
+  // Schedule of the rows on the sheet + route bar summary (admin)
   function computeTravel() {
 
     travel = new Array(ROWS).fill(null);
 
-    const { legs: dayLegs, wh: warehouse } = legsSource();
+    schedule = buildSchedule(previewStops());
 
-    const stops = [];
-    for (let i = 0; i < ROWS; i++) {
-      if (rowKey(i) && rowEvents[i]) stops.push(i);
+    for (const it of schedule.items) {
+      if (it.row >= 0) travel[it.row] = it;
     }
 
-    let prev = warehouse ? { place: warehouse, label: 'from warehouse' } : null;
-    let total = 0, km = 0, missing = 0, counted = 0;
+    const last = schedule.items[schedule.items.length - 1];
+    if (last && last.row >= 0 && schedule.wh) travel[last.row] = { ...last, back: schedule.backLeg || 'missing' };
 
-    const add = leg => {
-      if (leg && leg.minutes !== null) { total += leg.minutes; km += leg.km || 0; counted++; }
-      else missing++;
-    };
-
-    for (const i of stops) {
-
-      const place = mapsPlace(rowEvents[i]);
-
-      if (!place) {
-        travel[i] = { noPlace: true };
-        prev = null;
-        continue;
-      }
-
-      if (prev) {
-        const leg = dayLegs[prev.place + '→' + place] || null;
-        travel[i] = { label: prev.label, leg };
-        add(leg);
-      }
-
-      prev = { place, label: 'from previous' };
-
-    }
-
-    // last stop -> warehouse
-    const last = stops[stops.length - 1];
-    if (warehouse && last !== undefined && mapsPlace(rowEvents[last])) {
-      const leg = dayLegs[mapsPlace(rowEvents[last]) + '→' + warehouse] || null;
-      travel[last] = { ...(travel[last] || {}), back: leg || 'missing' };
-      add(leg);
-    }
-
-    // route bar: summary + Google Maps link
-    const places = stops.map(i => mapsPlace(rowEvents[i])).filter(Boolean);
-
-    $('route-drive').textContent = places.length
-      ? `Driving: ${minutesText(total)} · ${Math.round(km)} km` +
-        (warehouse ? ' (with return)' : '') +
-        (missing ? ` · ${missing} not calculated` : '')
+    $('route-drive').textContent = schedule.items.length
+      ? `Leave ${DEPART_TIME} → back ${schedule.back !== null ? (schedule.uncertain ? '~' : '') + clock(schedule.back) : '?'}` +
+        ` · driving ${minutesText(schedule.totalDrive)} · ${Math.round(schedule.km)} km` +
+        (schedule.missing ? ` · ${schedule.missing} not calculated` : '')
       : '';
 
   }
@@ -1518,7 +1653,7 @@
   function travelHtml(i) {
 
     const t = isAdmin && travel[i];
-    if (!t) return { before: '', after: '' };
+    if (!t || t.lunch) return { before: '', after: '' };
 
     let before = '';
 
@@ -1526,7 +1661,7 @@
       before = '<span class="travel missing">🚐 No place found for Maps</span>';
     } else if (t.label) {
       before = t.leg && t.leg.minutes !== null
-        ? `<span class="travel">🚐 ${escapeHtml(minutesText(t.leg.minutes))} · ${t.leg.km} km <small>${escapeHtml(t.label)}</small></span>`
+        ? `<span class="travel"${marginTitle(t.leg)}>🚐 ${escapeHtml(minutesText(t.leg.minutes))} · ${t.leg.km} km <small>${escapeHtml(t.label)}</small></span>`
         : `<span class="travel missing">🚐 Driving time not calculated yet <small>${escapeHtml(t.label)}</small></span>`;
     }
 
@@ -1534,7 +1669,7 @@
 
     if (t.back) {
       after = t.back !== 'missing' && t.back.minutes !== null
-        ? `<span class="travel back">↩ ${escapeHtml(minutesText(t.back.minutes))} · ${t.back.km} km back to warehouse</span>`
+        ? `<span class="travel back"${marginTitle(t.back)}>↩ ${escapeHtml(minutesText(t.back.minutes))} · ${t.back.km} km back to warehouse${schedule && schedule.back !== null ? ' · ~' + clock(schedule.back) : ''}</span>`
         : '<span class="travel back missing">↩ Return time not calculated yet</span>';
     }
 
@@ -1550,10 +1685,18 @@
     const num = field(i, 'number').value.trim();
     const tr = travelHtml(i);
 
-    if (ev) {
+    const t = travel[i];
+
+    if (ev && ev.lunch) {
+      cell.innerHTML = `
+        <div class="card-link lunch">
+          <span class="cl-time">🍽 Lunch${t ? ' · ' + escapeHtml(timeRange(t)) : ''}</span>
+          <span class="cl-title">${LUNCH_MIN} min break</span>
+        </div>`;
+    } else if (ev) {
       cell.innerHTML = tr.before + `
         <button type="button" class="card-link" data-card="${i}" style="--c:${safeHex(ev.colorHex)}" title="Open details">
-          <span class="cl-time">${escapeHtml(timeLabel(ev))}</span>
+          <span class="cl-time">${t ? escapeHtml(timeRange(t)) : escapeHtml(timeLabel(ev))}</span>
           <span class="cl-title">${escapeHtml(ev.title)}</span>
           ${ev.location ? `<span class="cl-loc">${escapeHtml(ev.location)}</span>` : ''}
         </button>` + tr.after;
@@ -1571,6 +1714,15 @@
     const sel = field(i, 'duration');
     const d = rowDur[i];
     const key = rowKey(i);
+
+    if (rowEvents[i] && rowEvents[i].lunch) {
+      sel.value = String(LUNCH_MIN);
+      sel.classList.remove('set');
+      $('row-' + i).classList.remove('flagged');
+      $('dur-plan-' + i).textContent = 'Lunch break';
+      $('dur-by-' + i).textContent = '';
+      return;
+    }
 
     sel.value = d && d.duration ? String(d.duration) : '';
     sel.classList.toggle('set', !!(d && d.duration));
@@ -1646,6 +1798,8 @@
   // Match the row's PP / OS with an event of the sheet date
   function linkRow(i) {
 
+    if (rowEvents[i] && rowEvents[i].lunch && !manualMode[i]) return;
+
     const kind = field(i, 'kind').value;
     const num = field(i, 'number').value.trim();
 
@@ -1700,6 +1854,10 @@
       field(i, 'kind').value = 'PP';
       field(i, 'number').value = '';
       rowEvents[i] = null;
+    } else if (value === LUNCH_KEY) {
+      field(i, 'kind').value = 'PP';
+      field(i, 'number').value = '';
+      rowEvents[i] = lunchEvent();
     } else if (value.startsWith('T:')) {
       // event without PP / OS: link the event, leave the number empty
       const ev = dayEvents.find(x => evKey(x) === value);
@@ -1790,7 +1948,7 @@
   // Legs to save with the sheet: only the ones this route uses
   function buildPlan() {
 
-    const { legs, wh } = legsSource();
+    const { legs, wh } = rawLegsSource();
     const places = [];
 
     for (let i = 0; i < ROWS; i++) {
@@ -1857,81 +2015,67 @@
       return;
     }
 
-    // ---- timeline ----
-    const legOf = (a, b) => (a && b ? legs[a + '→' + b] : null) || null;
+    // ---- timeline (from the schedule) ----
+    const sc = buildSchedule(stops);
     const driveHtml = leg => !showDrive ? ''
       : leg && leg.minutes !== null
-        ? `<div class="pv-drive">🚐 ${escapeHtml(minutesText(leg.minutes))} · ${leg.km} km</div>`
+        ? `<div class="pv-drive"${marginTitle(leg)}>🚐 ${escapeHtml(minutesText(leg.minutes))} · ${leg.km} km</div>`
         : '<div class="pv-drive missing">🚐 driving time not calculated yet</div>';
 
-    let totalDrive = 0, totalKm = 0, flags = 0;
+    let flags = 0, n = 0;
     const items = [];
-
-    const firstPlace = mapsPlace(stops[0].ev);
-    const firstLeg = wh ? legOf(wh, firstPlace) : null;
-    const firstStart = toMin(stops[0].ev.start);
-    const leaveAt = firstLeg && firstLeg.minutes !== null && firstStart !== null && !stops[0].ev.allDay
-      ? firstStart - firstLeg.minutes : null;
 
     if (wh) {
       items.push(`
         <li class="pv-item">
           <span class="pv-num wh">W</span>
-          <div class="pv-wh"><strong>Warehouse</strong> <small>${escapeHtml(wh)}</small>
-            ${showDrive && leaveAt !== null ? `<br><small>Leave by ${clock(leaveAt)}</small>` : ''}</div>
+          <div class="pv-wh"><strong>Leave warehouse ${DEPART_TIME}</strong> <small>${escapeHtml(wh)}</small></div>
         </li>`);
     }
 
-    let prevPlace = wh || null;
+    sc.items.forEach((it, k) => {
 
-    stops.forEach((s, k) => {
+      if (it.lunch) {
+        items.push(`
+          <li class="pv-item">
+            <span class="pv-num wh">🍽</span>
+            <div class="pv-wh"><strong>Lunch</strong> <small>${escapeHtml(timeRange(it))} · ${LUNCH_MIN} min</small></div>
+          </li>`);
+        return;
+      }
 
-      const ev = s.ev;
-      const place = mapsPlace(ev);
-      const leg = prevPlace && place ? legOf(prevPlace, place) : null;
-      if (leg && leg.minutes !== null) { totalDrive += leg.minutes; totalKm += leg.km || 0; }
-
-      const planned = plannedOf(ev);
-      const d = s.row >= 0 ? rowDur[s.row] : null;
+      n++;
+      const ev = it.ev;
+      const d = it.row >= 0 ? rowDur[it.row] : null;
       const real = d && d.duration ? d.duration : null;
-      const flagged = isAdmin && planned && real && planned !== real;
+      const flagged = isAdmin && it.planned && real && it.planned !== real;
       if (flagged) flags++;
 
       const refs = ev.refs && ev.refs.length ? refsText(ev.refs) : '';
 
       items.push(`
         <li class="pv-item" style="--c:${safeHex(ev.colorHex)}">
-          <span class="pv-num">${k + 1}</span>
+          <span class="pv-num">${n}</span>
           <div>
-            ${prevPlace || k > 0 ? driveHtml(leg) : ''}
+            ${it.label ? driveHtml(it.leg) : ''}
             <button type="button" class="pv-card" data-pv="${k}">
-              <strong>${escapeHtml(timeLabel(ev))}</strong>${planned ? ` <small style="display:inline">· ${escapeHtml(minutesText(planned))}</small>` : ''}
+              <strong>${escapeHtml(timeRange(it))}</strong>${it.service ? ` <small style="display:inline">· ${escapeHtml(minutesText(it.service))}${it.serviceFrom === 'real' ? '' : ' planned'}</small>` : ''}
               <span class="t">${escapeHtml(ev.title)}</span>
               ${refs ? `<small>${escapeHtml(refs)}</small>` : ''}
             </button>
-            ${flagged ? `<span class="flag">🚩 Real ${escapeHtml(minutesText(real))} · planned ${escapeHtml(minutesText(planned))}</span>` : ''}
+            ${flagged ? `<span class="flag">🚩 Real ${escapeHtml(minutesText(real))} · planned ${escapeHtml(minutesText(it.planned))}</span>` : ''}
           </div>
         </li>`);
 
-      prevPlace = place || null;
-
     });
-
-    // back to the warehouse
-    const lastEv = stops[stops.length - 1].ev;
-    const backLeg = wh && prevPlace ? legOf(prevPlace, wh) : null;
-    if (backLeg && backLeg.minutes !== null) { totalDrive += backLeg.minutes; totalKm += backLeg.km || 0; }
-    const lastEnd = toMin(lastEv.end);
-    const backAt = backLeg && backLeg.minutes !== null && lastEnd !== null && !lastEv.allDay
-      ? lastEnd + backLeg.minutes : null;
 
     if (wh) {
       items.push(`
         <li class="pv-item">
           <span class="pv-num wh">W</span>
           <div>
-            ${driveHtml(backLeg)}
-            <div class="pv-wh"><strong>Back at warehouse</strong>${showDrive && backAt !== null ? ` <small>~ ${clock(backAt)}</small>` : ''}</div>
+            ${driveHtml(sc.backLeg)}
+            <div class="pv-wh"><strong>Back at warehouse</strong>${sc.back !== null ? ` <small>${sc.uncertain ? '~ ' : ''}${clock(sc.back)}</small>` : ''}</div>
           </div>
         </li>`);
     }
@@ -1939,9 +2083,9 @@
     $('pv-list').innerHTML = items.join('');
 
     $('pv-sum').textContent =
-      `· ${stops.length} deliver${stops.length === 1 ? 'y' : 'ies'}` +
-      (showDrive && totalDrive ? ` · driving ${minutesText(totalDrive)} · ${Math.round(totalKm)} km` : '') +
-      (showDrive && leaveAt !== null && backAt !== null ? ` · ${clock(leaveAt)} → ${clock(backAt)}` : '') +
+      `· ${n} deliver${n === 1 ? 'y' : 'ies'}` +
+      ` · ${DEPART_TIME} → ${sc.back !== null ? (sc.uncertain ? '~' : '') + clock(sc.back) : clock(sc.end)}` +
+      (showDrive && sc.totalDrive ? ` · driving ${minutesText(sc.totalDrive)} (incl. ${DRIVE_MARGIN} min margin per trip) · ${Math.round(sc.km)} km` : '') +
       (flags ? ` · 🚩 ${flags}` : '');
 
     drawMap(stops, legs, wh);
@@ -2059,8 +2203,11 @@
 
     if (wh && coord[wh]) pin(coord[wh], 'W', '#2b2b2b', 'Warehouse');
 
+    let n = 0;
     places.forEach((pl, k) => {
-      if (pl && coord[pl]) pin(coord[pl], String(k + 1), safeHex(stops[k].ev.colorHex), stops[k].ev.title || '');
+      if (stops[k].ev.lunch) return;
+      n++;
+      if (pl && coord[pl]) pin(coord[pl], String(n), safeHex(stops[k].ev.colorHex), stops[k].ev.title || '');
     });
 
     if (bounds.length) map.fitBounds(bounds, { padding: [24, 24], maxZoom: 13 });
@@ -2147,12 +2294,12 @@
     $('cm-ref').textContent =
       (ev.refs && ev.refs.length) ? refsText(ev.refs)
       : ev.number ? `${ev.kind} ${ev.number}` : 'No PP / OS';
-    $('cm-when').textContent = [dateText, timeLabel(ev)].filter(Boolean).join(' · ');
+    $('cm-when').textContent = [dateText, 'calendar slot ' + timeLabel(ev)].filter(Boolean).join(' · ');
     $('cm-title').textContent = ev.title || '';
 
     const where = mapsPlace(ev);
     $('cm-loc-block').classList.toggle('hidden', !where);
-    $('cm-loc').textContent = ev.location || (ev.place ? ev.place + ' (area from the title)' : '');
+    $('cm-loc').textContent = ev.location || (where ? where + ' (area from the title)' : '');
     $('cm-map').href = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(where);
 
     const desc = descriptionText(ev.description);
@@ -2195,7 +2342,7 @@
 
     for (let i = 0; i < ROWS; i++) {
       const key = rowKey(i);
-      if (!key) continue;
+      if (!key || (rowEvents[i] && rowEvents[i].lunch)) continue;
       rows.push({ i, key });
     }
 
@@ -2253,7 +2400,7 @@
     for (let i = 0; i < ROWS; i++) {
 
       const key = rowKey(i);
-      if (!key) continue;
+      if (!key || (rowEvents[i] && rowEvents[i].lunch)) continue;
 
       const ev = rowEvents[i];
       const ref = rowRefText({ kind: field(i, 'kind').value, number: field(i, 'number').value.trim(), event: ev });
