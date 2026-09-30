@@ -77,6 +77,16 @@ async function isAdmin(request, env) {
 }
 
 
+// Apps Script web app address ('' if not one)
+function validSyncUrl(v) {
+
+  const t = String(v || '').trim();
+
+  return /^https:\/\/script\.google\.com\/[\w\-./]+\/(exec|dev)$/.test(t) ? t.slice(0, 300) : '';
+
+}
+
+
 // "lat,lng" text or ''
 function coordText(v) {
 
@@ -325,10 +335,12 @@ export class SheetStore {
         calendarColor,
         warehouse: clean(body.warehouse, 200),
         warehouseCoords: coordText(body.warehouseCoords),
-        // web app address of the Apps Script (website "Sync calendar" button)
-        syncUrl: /^https:\/\/script\.google\.com\/[\w\-./]+$/.test(body.syncUrl || '')
-          ? body.syncUrl.slice(0, 300)
-          : (previous.syncUrl || ''),
+        // web app address of the Apps Script (website "Sync calendar" button);
+        // a link pasted by the admin on the website always wins
+        syncUrl: previous.syncUrlManual
+          ? previous.syncUrl
+          : (validSyncUrl(body.syncUrl) || previous.syncUrl || ''),
+        syncUrlManual: !!previous.syncUrlManual,
         days,
         legDays: Object.keys(legsByDay)
       });
@@ -387,7 +399,10 @@ export class SheetStore {
 
     if (path === '/api/me' && method === 'GET') {
 
-      return json({ name, admin });
+      const meta =
+        admin ? ((await storage.get('calendar-meta')) || {}) : {};
+
+      return json({ name, admin, syncUrl: admin ? (meta.syncUrl || '') : '' });
 
     }
 
@@ -415,6 +430,36 @@ export class SheetStore {
       return json(
         (await storage.get('access-log')) || []
       );
+
+    }
+
+
+    // ---------- SYNC LINK pasted by the admin ----------
+
+    if (path === '/api/sync-url' && method === 'PUT') {
+
+      if (!admin) return json({ error: 'Admin only' }, 403);
+
+      const body =
+        await request.json().catch(() => ({}));
+
+      const link = validSyncUrl(body.url);
+
+      if (body.url && !link) {
+
+        return json({ error: 'Not an Apps Script web app link (…script.google.com/…/exec)' }, 400);
+
+      }
+
+      const meta =
+        (await storage.get('calendar-meta')) || {};
+
+      meta.syncUrl = link;
+      meta.syncUrlManual = !!link;
+
+      await storage.put('calendar-meta', meta);
+
+      return json({ ok: true, syncUrl: link });
 
     }
 
