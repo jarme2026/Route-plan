@@ -780,6 +780,7 @@
       <span id="route-name" class="basic-only"></span>
       <button type="button" class="small admin-only" id="route-fill" title="Put every event of this route on the sheet">Fill all</button>
       <button type="button" class="small admin-only" id="route-sync" title="Read Google Calendar now (opens the Apps Script in a new tab)">⟳ Sync calendar</button>
+      <button type="button" class="small admin-only" id="route-sync-link" title="Paste / change the Apps Script web app link">⚙</button>
       <button type="button" class="small admin-only" id="route-refresh" title="Reload what was last synced">Refresh</button>
       <a class="btn small hidden" id="route-map" target="_blank" rel="noopener">Open route in Maps</a>
       <small id="route-drive" class="admin-only"></small>
@@ -1437,6 +1438,7 @@
     $('route-fill').disabled = !adminEdit || !routes.some(r => r.name === currentRoute);
     $('route-refresh').disabled = !adminEdit;
     $('route-sync').disabled = !isAdmin;
+    $('route-sync-link').disabled = !isAdmin;
     $('btn-save').disabled = closed;
 
     document.querySelectorAll('[data-field=pick], [data-field=kind], [data-field=number]')
@@ -1957,19 +1959,46 @@
   function syncCalendar() {
 
     if (!syncUrl) {
-      alert(
-        'The Sync button is not set up yet.\n\n' +
-        '1. In Apps Script: Deploy → New deployment → Web app\n' +
-        '   Execute as: Me · Who has access: Anyone within BoConcept Dublin\n' +
-        '2. ▶ Run "atualizarPlanilha" once in the editor.\n\n' +
-        'After that this button works from here.'
-      );
+      setSyncLink();
       return;
     }
 
     syncPending = syncedAt || '';
     window.open(syncUrl, 'route-plan-sync');
     setStatus('Syncing in the new tab… come back here when it says "Calendar synced"');
+
+  }
+
+
+  // Admin pastes the web app link: Apps Script → Deploy → Manage deployments → Web app URL
+  async function setSyncLink() {
+
+    const typed = prompt(
+      'Paste the Apps Script web app link\n\n' +
+      'Apps Script → Deploy → Manage deployments → select the Web app →\n' +
+      'copy "Web app URL" (it ends with /exec).\n\n' +
+      '(Deployment settings: Execute as Me · Anyone within BoConcept Dublin)',
+      syncUrl
+    );
+
+    if (typed === null) return;
+
+    try {
+
+      const res = await api('/api/sync-url', {
+        method: 'PUT',
+        body: JSON.stringify({ url: typed.trim() })
+      });
+
+      syncUrl = res.syncUrl || '';
+
+      setStatus(syncUrl ? 'Sync link saved – press ⟳ Sync calendar' : 'Sync link removed', 'ok');
+
+    } catch (err) {
+
+      setStatus('Sync link not saved: ' + err.message, 'err');
+
+    }
 
   }
 
@@ -3047,6 +3076,7 @@
         return;
       }
       isAdmin = !!me.admin;
+      syncUrl = me.syncUrl || syncUrl;
     } catch (err) {
       showError('Could not connect: ' + err.message);
       return;
@@ -3113,6 +3143,7 @@
     }
   });
   $('route-sync').addEventListener('click', syncCalendar);
+  $('route-sync-link').addEventListener('click', setSyncLink);
 
   // back from the sync tab -> reload the calendar once
   window.addEventListener('focus', () => setTimeout(afterSync, 400));
