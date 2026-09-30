@@ -325,6 +325,10 @@ export class SheetStore {
         calendarColor,
         warehouse: clean(body.warehouse, 200),
         warehouseCoords: coordText(body.warehouseCoords),
+        // web app address of the Apps Script (website "Sync calendar" button)
+        syncUrl: /^https:\/\/script\.google\.com\/[\w\-./]+$/.test(body.syncUrl || '')
+          ? body.syncUrl.slice(0, 300)
+          : (previous.syncUrl || ''),
         days,
         legDays: Object.keys(legsByDay)
       });
@@ -337,6 +341,15 @@ export class SheetStore {
         days: days.length,
         legs: legEntries.reduce((n, [, legs]) => n + Object.keys(legs).length, 0)
       });
+
+    }
+
+
+    // ---------- AREAS SET BY THE ADMIN (read by the Apps Script) ----------
+
+    if (path === '/api/calendar/overrides' && method === 'GET') {
+
+      return json((await storage.get('place-overrides')) || {});
 
     }
 
@@ -406,6 +419,51 @@ export class SheetStore {
     }
 
 
+    // ---------- AREA FOR GOOGLE MAPS (admin) ----------
+    // key = "YYYY-MM-DD|event title"; empty place removes it
+
+    if (path === '/api/places' && method === 'PUT') {
+
+      if (!admin) return json({ error: 'Admin only' }, 403);
+
+      const body =
+        await request.json().catch(() => ({}));
+
+      const date = String(body.date || '').slice(0, 10);
+      const title = String(body.title || '').trim().slice(0, 300);
+      const place = String(body.place || '').trim().slice(0, 200);
+
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !title) {
+
+        return json({ error: 'date and title required' }, 400);
+
+      }
+
+      const all =
+        (await storage.get('place-overrides')) || {};
+
+      const k = date + '|' + title;
+
+      if (place) all[k] = place;
+      else delete all[k];
+
+      // forget areas of days more than 30 days ago
+      const limit =
+        new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+
+      for (const key of Object.keys(all)) {
+
+        if (key.slice(0, 10) < limit) delete all[key];
+
+      }
+
+      await storage.put('place-overrides', all);
+
+      return json({ ok: true, key: k, place });
+
+    }
+
+
     // ---------- CALENDAR (events of one day, admin only) ----------
 
     if (path === '/api/calendar' && method === 'GET') {
@@ -424,15 +482,27 @@ export class SheetStore {
       const meta =
         (await storage.get('calendar-meta')) || {};
 
+      const overrides =
+        (await storage.get('place-overrides')) || {};
+
       const events =
         ((await storage.get('cal:' + date)) || [])
-          .sort((a, b) => (a.start || '').localeCompare(b.start || ''));
+          .sort((a, b) => (a.start || '').localeCompare(b.start || ''))
+          .map(e => {
+            const area = overrides[date + '|' + String(e.title || '').trim()];
+            if (!area) return e;
+            // new area not synced yet: its old map point is no longer valid
+            return e.place === area
+              ? { ...e, areaSet: true }
+              : { ...e, place: area, coords: '', areaSet: true };
+          });
 
       return json({
         syncedAt: meta.syncedAt || null,
         calendarColor: meta.calendarColor || '',
         warehouse: meta.warehouse || '',
         warehouseCoords: meta.warehouseCoords || '',
+        syncUrl: meta.syncUrl || '',
         legs: (await storage.get('legs:' + date)) || {},
         date,
         events
@@ -718,7 +788,7 @@ export default {
     if (url.pathname.startsWith('/api/')) {
 
       // Calendar push from Google needs the secret SYNC_KEY (or SYNC_TOKEN)
-      if (url.pathname === '/api/calendar/sync') {
+      if (url.pathname === '/api/calendar/sync' || url.pathname === '/api/calendar/overrides') {
 
         const key =
           request.headers.get('x-sync-key') || '';
