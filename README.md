@@ -6,21 +6,30 @@ Digital delivery sheet fed by Google Calendar, served by a Cloudflare Worker.
 
 | | Admin (password) | Team (name only) |
 |---|---|---|
-| Date, route, PP / OS, sign out / in | edit | read |
-| Delivery card (first column) | yes | yes |
-| Delivery duration | edit | edit |
-| Save / New / Delete sheet | yes | – |
-| Answers (every duration choice) + CSV | yes | – |
-| Close / reopen the day | yes | – |
+| Date, route, PP / OS, sign out / in | edit | – |
+| Route preview (timeline + map + Google Maps link) | yes | yes (read only) |
+| Driving times, leave / back times | yes | – |
+| Delivery duration + red flags | edit | – |
+| Save / New / Delete sheet, Answers + CSV, Close day | yes | – |
 
 - Admin password = Cloudflare secret `ADMIN_PASSWORD`. Changing it logs every admin out.
-- Everybody types their name when the page opens; every duration choice is recorded with
-  name and time. The sheet shows the latest choice; "Answers" shows the full history.
-- "Close day" locks the sheet (nobody can change durations) and opens the answers report.
-- Team members see only the rows with a delivery. Today's sheet opens by itself when there
-  is only one; otherwise they pick it from "Sheets".
+- Everybody types their name when the page opens. Team members only see the route preview of
+  the saved sheets; today's sheet opens by itself when there is only one.
+- Red flag 🚩: the delivery duration chosen by the admin differs from the planned time (length of
+  the calendar event). No tolerance. Shown on the row, in the preview, in the sheet list, in
+  Answers and in the CSV ("Red flag" = YES) – to check with the driver.
+- "Close day" locks the sheet and opens the answers report.
 - No automatic refresh: the sheet is reloaded from the server whenever you change something
   (duration, save, close / reopen), when you press Refresh, or when you reload the page.
+
+## Route preview
+
+- Admin: appears as soon as a date and a route are chosen (from the calendar, before filling the
+  sheet), then follows the rows of the sheet.
+- Team: the route saved with the sheet (the admin's last Save).
+- Warehouse A94 HX83 (`ARMAZEM` in the Apps Script) is the start and the end of every route.
+- The map uses Leaflet + OpenStreetMap, loaded by the browser only when a preview is shown:
+  no extra Cloudflare requests. Road paths and coordinates come from the Apps Script.
 
 ## Sheet
 
@@ -31,10 +40,23 @@ Digital delivery sheet fed by Google Calendar, served by a Cloudflare Worker.
   (30 minutes → 6 hours, 15-minute steps).
 - Mobile: each delivery is a numbered block.
 
+## Driving times (admin only)
+
+- The Apps Script works out, with Google Maps, the driving time between consecutive deliveries
+  of each route (same day + colour, in calendar time order), plus warehouse → first and
+  last → warehouse (`ARMAZEM` in the Apps Script). Results are cached for 6 hours.
+- Place used for each delivery: the event's Location, else a full Eircode in title /
+  description, else the area at the start of the title ("D04" → "Dublin 4, Ireland").
+- The sheet shows the time above each delivery card, the day total in the route bar and an
+  "Open route in Maps" button with every stop in sheet order.
+- If the admin puts the deliveries in a different order from the calendar, the missing pairs
+  show "not calculated yet".
+
 ## Structure
 
 ```
 public/index.html      page (HTML + CSS + JS in one file)
+google-apps-script.js  Apps Script (calendar sync + driving times)
 src/index.js           Worker + Durable Object (SheetStore)
 wrangler.jsonc         Cloudflare config
 ```
