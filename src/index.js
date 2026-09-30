@@ -77,6 +77,16 @@ async function isAdmin(request, env) {
 }
 
 
+// "lat,lng" text or ''
+function coordText(v) {
+
+  const t = String(v || '').replace(/\s+/g, '');
+
+  return /^-?\d{1,2}(\.\d+)?,-?\d{1,3}(\.\d+)?$/.test(t) ? t.slice(0, 40) : '';
+
+}
+
+
 // [lat, lng] or null
 function point(p) {
 
@@ -133,6 +143,7 @@ function cleanPlan(plan) {
 
   const out = {
     warehouse: String(plan.warehouse || '').slice(0, 200),
+    warehouseCoords: coordText(plan.warehouseCoords),
     legs
   };
 
@@ -243,6 +254,7 @@ export class SheetStore {
           kind: ev.kind === 'OS' ? 'OS' : (ev.kind === 'PP' ? 'PP' : ''),
           number: clean(ev.number, 30),
           place: clean(ev.place, 200),
+          coords: coordText(ev.coords),
           minutes: Number(ev.minutes) || 0
         };
 
@@ -312,6 +324,7 @@ export class SheetStore {
         syncedAt: new Date().toISOString(),
         calendarColor,
         warehouse: clean(body.warehouse, 200),
+        warehouseCoords: coordText(body.warehouseCoords),
         days,
         legDays: Object.keys(legsByDay)
       });
@@ -419,6 +432,7 @@ export class SheetStore {
         syncedAt: meta.syncedAt || null,
         calendarColor: meta.calendarColor || '',
         warehouse: meta.warehouse || '',
+        warehouseCoords: meta.warehouseCoords || '',
         legs: (await storage.get('legs:' + date)) || {},
         date,
         events
