@@ -363,8 +363,125 @@
 
   .no-event { font-size: 13px; color: var(--muted); font-style: italic; }
 
-  /* team view: only rows with a delivery */
-  body.role-basic table.deliveries tr.empty { display: none; }
+  /* driving time (admin) */
+  .travel { display: block; font-size: 12px; color: #5a4a00; background: #fff6d6; border-radius: 5px; padding: 1px 6px; margin: 0 0 3px; }
+  .travel.back { margin: 3px 0 0; }
+  .travel.missing { color: var(--muted); background: #f1f2f4; }
+
+  a.btn { text-decoration: none; display: inline-block; }
+  #route-drive { font-weight: 700; color: var(--ink); }
+
+  /* team view: route preview only */
+  body.role-basic table.deliveries,
+  body.role-basic .sign { display: none; }
+
+  /* planned vs real duration (admin) */
+  .dur-plan { display: block; font-size: 12px; color: var(--muted); }
+  .flag { display: inline-block; font-size: 12px; font-weight: 700; color: #fff; background: var(--danger); border-radius: 5px; padding: 1px 6px; margin-top: 2px; }
+  tr.flagged td.c-times { background: #fdecea; }
+
+  /* ---------- ROUTE PREVIEW ---------- */
+
+  .preview { border-bottom: 2px solid var(--line); }
+
+  .preview > summary {
+    cursor: pointer;
+    padding: 10px 14px;
+    font-weight: 700;
+    font-size: 17px;
+  }
+
+  .preview > summary small { font-weight: 400; color: var(--muted); font-size: 14px; }
+
+  .pv-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+    padding: 0 14px 14px;
+  }
+
+  .pv-list { list-style: none; margin: 0; padding: 0; }
+
+  .pv-item {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 8px;
+    padding: 6px 0;
+    border-top: 1px solid #eee;
+  }
+
+  .pv-item:first-child { border-top: 0; }
+
+  .pv-num {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--c, #555);
+    color: #fff;
+    font-weight: 700;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pv-num.wh { background: #2b2b2b; }
+
+  .pv-drive { font-size: 12px; color: #5a4a00; }
+  .pv-drive.missing { color: var(--muted); }
+
+  .pv-card {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 4px 8px;
+    font-size: 14px;
+    line-height: 1.3;
+    border: 1px solid #e0e3e7;
+    border-left: 5px solid var(--c, #999);
+    border-radius: 6px;
+    background: #fafbfc;
+  }
+
+  .pv-card small { display: block; color: var(--muted); font-size: 12px; }
+  .pv-card .t { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .pv-wh { font-size: 14px; }
+  .pv-wh small { color: var(--muted); }
+
+  #pv-map {
+    min-height: 320px;
+    height: 100%;
+    border-radius: 8px;
+    background: #eef0f3;
+    position: relative;
+    z-index: 0;
+  }
+
+  .pv-map-msg {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+    padding: 16px;
+  }
+
+  .pv-pin {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, .4);
+    color: #fff;
+    font: 700 12px/20px Calibri, Arial, sans-serif;
+    text-align: center;
+  }
+
+  .pv-empty { color: var(--muted); font-size: 14px; padding: 0 14px 14px; }
 
   .sign {
     padding: 22px 14px 6px;
@@ -496,6 +613,9 @@
 
     .sign { padding: 16px 12px; }
 
+    .pv-grid { grid-template-columns: minmax(0, 1fr); padding: 0 12px 12px; }
+    #pv-map { order: -1; min-height: 240px; height: 240px; }
+
     .modal { align-items: flex-end; padding: 0; }
     .card-box, .answers-box { max-width: none; border-radius: 14px 14px 0 0; max-height: 88vh; }
   }
@@ -507,7 +627,11 @@
 
     body { background: #fff; }
 
-    .toolbar, .panel, #gate, .modal, .route-bar small, .route-bar button, .closed-banner { display: none !important; }
+    .toolbar, .panel, #gate, .modal, .route-bar small, .route-bar button, .route-bar a, .travel, .closed-banner, .flag, .dur-plan { display: none !important; }
+    body.role-admin .preview { display: none !important; }
+    .preview > summary { list-style: none; }
+    #pv-map { display: none; }
+    .pv-grid { grid-template-columns: 1fr; }
 
     .paper { box-shadow: none; margin: 0; padding: 0; max-width: none; }
 
@@ -644,8 +768,19 @@
       <span id="route-name" class="basic-only"></span>
       <button type="button" class="small admin-only" id="route-fill" title="Put every event of this route on the sheet">Fill all</button>
       <button type="button" class="small admin-only" id="route-refresh" title="Reload the calendar">Refresh</button>
+      <a class="btn small hidden" id="route-map" target="_blank" rel="noopener">Open route in Maps</a>
+      <small id="route-drive" class="admin-only"></small>
       <small id="cal-synced" class="admin-only"></small>
     </div>
+
+    <details class="preview" id="preview" open>
+      <summary>Route preview <small id="pv-sum"></small></summary>
+      <div class="pv-grid" id="pv-grid">
+        <ol class="pv-list" id="pv-list"></ol>
+        <div id="pv-map"><div class="pv-map-msg" id="pv-map-msg">Loading map…</div></div>
+      </div>
+      <div class="pv-empty hidden" id="pv-empty"></div>
+    </details>
 
     <table class="deliveries">
       <colgroup>
@@ -889,6 +1024,62 @@
     return ev.number ? ev.kind + ':' + ev.number : 'T:' + (ev.start || '') + '|' + (ev.title || '');
   }
 
+  function minutesText(m) {
+    if (m === null || m === undefined) return '?';
+    const h = Math.floor(m / 60), r = m % 60;
+    return h ? `${h} h${r ? ' ' + r + ' min' : ''}` : `${r} min`;
+  }
+
+  function toMin(t) {
+    const [h, m] = String(t || '').split(':').map(Number);
+    return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : null;
+  }
+
+  function clock(min) {
+    if (min === null || min === undefined) return '';
+    const m = ((min % 1440) + 1440) % 1440;
+    return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+  }
+
+  // Planned minutes of a delivery = length of its calendar event
+  function plannedOf(ev) {
+    if (!ev || ev.allDay) return null;
+    const a = toMin(ev.start), b = toMin(ev.end);
+    return a !== null && b !== null && b > a ? b - a : null;
+  }
+
+  // Google encoded polyline -> [[lat, lng], ...]
+  function decodePolyline(str) {
+    const out = [];
+    let i = 0, lat = 0, lng = 0;
+    while (i < (str || '').length) {
+      for (const which of [0, 1]) {
+        let shift = 0, result = 0, b;
+        do { b = str.charCodeAt(i++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+        const d = (result & 1) ? ~(result >> 1) : (result >> 1);
+        if (which === 0) lat += d; else lng += d;
+      }
+      out.push([lat / 1e5, lng / 1e5]);
+    }
+    return out;
+  }
+
+  // Driving legs + warehouse to use: live calendar (admin) or the copy saved with the sheet
+  function legsSource() {
+    const saved = sheetPlan || {};
+    if (isAdmin) {
+      return {
+        legs: { ...(saved.legs || {}), ...dayLegs },
+        wh: warehouse || saved.warehouse || ''
+      };
+    }
+    return { legs: saved.legs || {}, wh: saved.warehouse || '' };
+  }
+
+  function mapsPlace(ev) {
+    return (ev && (ev.location || ev.place)) || '';
+  }
+
   // Text of a sheet row: PP / OS list, or the event title
   function rowRefText(row) {
     if (row.event && row.event.refs && row.event.refs.length) return refsText(row.event.refs);
@@ -916,6 +1107,10 @@
   let syncedAt = null;
   let dayEvents = [];              // events of the sheet date (already filtered)
   let routes = [];                 // [{ name, hex, events: [...] }]
+  let dayLegs = {};                // driving times of the day: { "from→to": { minutes, km } }
+  let warehouse = '';              // van start / end (from the Apps Script)
+  let travel = [];                 // per row: { from, leg, back } (admin)
+  let sheetPlan = null;            // route saved with the sheet (legs + warehouse)
   let currentRoute = '';           // route name (colour)
   let routeHex = '';
 
@@ -984,7 +1179,7 @@
     const c = colorOf(ev);
     return {
       date: ev.date, start: ev.start, end: ev.end, allDay: !!ev.allDay,
-      title: ev.title, location: ev.location, description: ev.description || '',
+      title: ev.title, location: ev.location, place: ev.place || '', description: ev.description || '',
       kind: ev.kind, number: ev.number, refs: ev.refs || [], colorName: c.name, colorHex: c.hex
     };
   }
@@ -1099,6 +1294,7 @@
         <td class="c-times">
           <span class="m-label">Delivery duration</span>
           <select class="dur" data-row="${i}" data-field="duration" aria-label="Delivery duration"></select>
+          <span class="dur-plan" id="dur-plan-${i}"></span>
           <span class="dur-by" id="dur-by-${i}"></span>
         </td>`;
 
@@ -1145,7 +1341,7 @@
       .forEach(el => { el.disabled = !adminEdit; });
 
     document.querySelectorAll('[data-field=duration]')
-      .forEach(el => { el.disabled = closed || !rowKey(Number(el.dataset.row)); });
+      .forEach(el => { el.disabled = !isAdmin || closed || !rowKey(Number(el.dataset.row)); });
 
     $('btn-close').textContent = closed ? 'Reopen day' : 'Close day';
     $('btn-close').disabled = !sheetSaved;
@@ -1259,19 +1455,108 @@
   }
 
 
+  // Driving time for each row, in sheet order (admin)
+  function computeTravel() {
+
+    travel = new Array(ROWS).fill(null);
+
+    const { legs: dayLegs, wh: warehouse } = legsSource();
+
+    const stops = [];
+    for (let i = 0; i < ROWS; i++) {
+      if (rowKey(i) && rowEvents[i]) stops.push(i);
+    }
+
+    let prev = warehouse ? { place: warehouse, label: 'from warehouse' } : null;
+    let total = 0, km = 0, missing = 0, counted = 0;
+
+    const add = leg => {
+      if (leg && leg.minutes !== null) { total += leg.minutes; km += leg.km || 0; counted++; }
+      else missing++;
+    };
+
+    for (const i of stops) {
+
+      const place = mapsPlace(rowEvents[i]);
+
+      if (!place) {
+        travel[i] = { noPlace: true };
+        prev = null;
+        continue;
+      }
+
+      if (prev) {
+        const leg = dayLegs[prev.place + '→' + place] || null;
+        travel[i] = { label: prev.label, leg };
+        add(leg);
+      }
+
+      prev = { place, label: 'from previous' };
+
+    }
+
+    // last stop -> warehouse
+    const last = stops[stops.length - 1];
+    if (warehouse && last !== undefined && mapsPlace(rowEvents[last])) {
+      const leg = dayLegs[mapsPlace(rowEvents[last]) + '→' + warehouse] || null;
+      travel[last] = { ...(travel[last] || {}), back: leg || 'missing' };
+      add(leg);
+    }
+
+    // route bar: summary + Google Maps link
+    const places = stops.map(i => mapsPlace(rowEvents[i])).filter(Boolean);
+
+    $('route-drive').textContent = places.length
+      ? `Driving: ${minutesText(total)} · ${Math.round(km)} km` +
+        (warehouse ? ' (with return)' : '') +
+        (missing ? ` · ${missing} not calculated` : '')
+      : '';
+
+  }
+
+
+  function travelHtml(i) {
+
+    const t = isAdmin && travel[i];
+    if (!t) return { before: '', after: '' };
+
+    let before = '';
+
+    if (t.noPlace) {
+      before = '<span class="travel missing">🚐 No place found for Maps</span>';
+    } else if (t.label) {
+      before = t.leg && t.leg.minutes !== null
+        ? `<span class="travel">🚐 ${escapeHtml(minutesText(t.leg.minutes))} · ${t.leg.km} km <small>${escapeHtml(t.label)}</small></span>`
+        : `<span class="travel missing">🚐 Driving time not calculated yet <small>${escapeHtml(t.label)}</small></span>`;
+    }
+
+    let after = '';
+
+    if (t.back) {
+      after = t.back !== 'missing' && t.back.minutes !== null
+        ? `<span class="travel back">↩ ${escapeHtml(minutesText(t.back.minutes))} · ${t.back.km} km back to warehouse</span>`
+        : '<span class="travel back missing">↩ Return time not calculated yet</span>';
+    }
+
+    return { before, after };
+
+  }
+
+
   function renderCardCell(i) {
 
     const cell = $('card-' + i);
     const ev = rowEvents[i];
     const num = field(i, 'number').value.trim();
+    const tr = travelHtml(i);
 
     if (ev) {
-      cell.innerHTML = `
+      cell.innerHTML = tr.before + `
         <button type="button" class="card-link" data-card="${i}" style="--c:${safeHex(ev.colorHex)}" title="Open details">
           <span class="cl-time">${escapeHtml(timeLabel(ev))}</span>
           <span class="cl-title">${escapeHtml(ev.title)}</span>
           ${ev.location ? `<span class="cl-loc">${escapeHtml(ev.location)}</span>` : ''}
-        </button>`;
+        </button>` + tr.after;
     } else if (num) {
       cell.innerHTML = '<span class="no-event">No calendar event for this PP / OS</span>';
     } else {
@@ -1289,6 +1574,16 @@
 
     sel.value = d && d.duration ? String(d.duration) : '';
     sel.classList.toggle('set', !!(d && d.duration));
+
+    // planned (calendar) vs real (chosen) -> red flag
+    const planned = key ? plannedOf(rowEvents[i]) : null;
+    const real = d && d.duration ? d.duration : null;
+    const flagged = !!(planned && real && planned !== real);
+
+    $('row-' + i).classList.toggle('flagged', flagged);
+    $('dur-plan-' + i).innerHTML = !planned ? ''
+      : `Planned ${escapeHtml(minutesText(planned))}` +
+        (flagged ? ` <span class="flag">🚩 ${real > planned ? '+' : '−'}${escapeHtml(minutesText(Math.abs(real - planned)))}</span>` : '');
 
     const by = $('dur-by-' + i);
     by.classList.toggle('saved', justSaved[i]);
@@ -1332,6 +1627,8 @@
       if (k) used.add(k);
     }
 
+    if (isAdmin) computeTravel();
+
     for (let i = 0; i < ROWS; i++) {
       if (isAdmin) renderPick(i, used);
       renderRefs(i);
@@ -1341,6 +1638,7 @@
 
     markRows();
     applyLock();
+    schedulePreview();
 
   }
 
@@ -1467,7 +1765,313 @@
 
 
   // =========================================
-  // DELIVERY DURATION (everyone)
+  // ROUTE PREVIEW (map + timeline)
+  // =========================================
+
+  // Stops of the preview: the sheet rows, or (admin, empty sheet) the route from the calendar
+  function previewStops() {
+
+    const stops = [];
+
+    for (let i = 0; i < ROWS; i++) {
+      if (rowKey(i) && rowEvents[i]) stops.push({ ev: rowEvents[i], row: i });
+    }
+
+    if (!stops.length && isAdmin) {
+      const route = routes.find(r => r.name === currentRoute);
+      if (route) route.events.forEach(e => stops.push({ ev: snapshot(e), row: -1 }));
+    }
+
+    return stops;
+
+  }
+
+
+  // Legs to save with the sheet: only the ones this route uses
+  function buildPlan() {
+
+    const { legs, wh } = legsSource();
+    const places = [];
+
+    for (let i = 0; i < ROWS; i++) {
+      if (rowKey(i) && rowEvents[i] && mapsPlace(rowEvents[i])) places.push(mapsPlace(rowEvents[i]));
+    }
+
+    const chain = wh ? [wh, ...places, wh] : places;
+    const used = {};
+
+    for (let k = 1; k < chain.length; k++) {
+      const key = chain[k - 1] + '→' + chain[k];
+      if (legs[key]) used[key] = legs[key];
+    }
+
+    return { warehouse: wh, legs: used };
+
+  }
+
+
+  let previewTimer = null;
+
+  function schedulePreview() {
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(renderPreview, 30);
+  }
+
+
+  let previewEvents = [];
+
+  function renderPreview() {
+
+    const stops = previewStops();
+    const { legs, wh } = legsSource();
+    const showDrive = isAdmin;          // driving times: admin only
+
+    previewEvents = stops.map(s => s.ev);
+
+    const hasRoute = !!(stops.length);
+    $('pv-grid').classList.toggle('hidden', !hasRoute);
+    $('pv-empty').classList.toggle('hidden', hasRoute);
+    $('pv-empty').textContent = !sheetIsoDate() ? 'Choose the date and the route.'
+      : !currentRoute ? 'Choose a route to see the preview.'
+      : 'No deliveries on this route.';
+
+    // Google Maps link (everyone)
+    const places = stops.map(s => mapsPlace(s.ev)).filter(Boolean);
+    const link = $('route-map');
+
+    if (places.length) {
+      const origin = wh || places[0];
+      const destination = wh || places[places.length - 1];
+      const waypoints = wh ? places : places.slice(1, -1);
+      link.href = 'https://www.google.com/maps/dir/?api=1&travelmode=driving' +
+        '&origin=' + encodeURIComponent(origin) +
+        '&destination=' + encodeURIComponent(destination) +
+        (waypoints.length ? '&waypoints=' + encodeURIComponent(waypoints.join('|')) : '');
+      link.classList.remove('hidden');
+    } else {
+      link.classList.add('hidden');
+    }
+
+    if (!hasRoute) {
+      $('pv-sum').textContent = '';
+      return;
+    }
+
+    // ---- timeline ----
+    const legOf = (a, b) => (a && b ? legs[a + '→' + b] : null) || null;
+    const driveHtml = leg => !showDrive ? ''
+      : leg && leg.minutes !== null
+        ? `<div class="pv-drive">🚐 ${escapeHtml(minutesText(leg.minutes))} · ${leg.km} km</div>`
+        : '<div class="pv-drive missing">🚐 driving time not calculated yet</div>';
+
+    let totalDrive = 0, totalKm = 0, flags = 0;
+    const items = [];
+
+    const firstPlace = mapsPlace(stops[0].ev);
+    const firstLeg = wh ? legOf(wh, firstPlace) : null;
+    const firstStart = toMin(stops[0].ev.start);
+    const leaveAt = firstLeg && firstLeg.minutes !== null && firstStart !== null && !stops[0].ev.allDay
+      ? firstStart - firstLeg.minutes : null;
+
+    if (wh) {
+      items.push(`
+        <li class="pv-item">
+          <span class="pv-num wh">W</span>
+          <div class="pv-wh"><strong>Warehouse</strong> <small>${escapeHtml(wh)}</small>
+            ${showDrive && leaveAt !== null ? `<br><small>Leave by ${clock(leaveAt)}</small>` : ''}</div>
+        </li>`);
+    }
+
+    let prevPlace = wh || null;
+
+    stops.forEach((s, k) => {
+
+      const ev = s.ev;
+      const place = mapsPlace(ev);
+      const leg = prevPlace && place ? legOf(prevPlace, place) : null;
+      if (leg && leg.minutes !== null) { totalDrive += leg.minutes; totalKm += leg.km || 0; }
+
+      const planned = plannedOf(ev);
+      const d = s.row >= 0 ? rowDur[s.row] : null;
+      const real = d && d.duration ? d.duration : null;
+      const flagged = isAdmin && planned && real && planned !== real;
+      if (flagged) flags++;
+
+      const refs = ev.refs && ev.refs.length ? refsText(ev.refs) : '';
+
+      items.push(`
+        <li class="pv-item" style="--c:${safeHex(ev.colorHex)}">
+          <span class="pv-num">${k + 1}</span>
+          <div>
+            ${prevPlace || k > 0 ? driveHtml(leg) : ''}
+            <button type="button" class="pv-card" data-pv="${k}">
+              <strong>${escapeHtml(timeLabel(ev))}</strong>${planned ? ` <small style="display:inline">· ${escapeHtml(minutesText(planned))}</small>` : ''}
+              <span class="t">${escapeHtml(ev.title)}</span>
+              ${refs ? `<small>${escapeHtml(refs)}</small>` : ''}
+            </button>
+            ${flagged ? `<span class="flag">🚩 Real ${escapeHtml(minutesText(real))} · planned ${escapeHtml(minutesText(planned))}</span>` : ''}
+          </div>
+        </li>`);
+
+      prevPlace = place || null;
+
+    });
+
+    // back to the warehouse
+    const lastEv = stops[stops.length - 1].ev;
+    const backLeg = wh && prevPlace ? legOf(prevPlace, wh) : null;
+    if (backLeg && backLeg.minutes !== null) { totalDrive += backLeg.minutes; totalKm += backLeg.km || 0; }
+    const lastEnd = toMin(lastEv.end);
+    const backAt = backLeg && backLeg.minutes !== null && lastEnd !== null && !lastEv.allDay
+      ? lastEnd + backLeg.minutes : null;
+
+    if (wh) {
+      items.push(`
+        <li class="pv-item">
+          <span class="pv-num wh">W</span>
+          <div>
+            ${driveHtml(backLeg)}
+            <div class="pv-wh"><strong>Back at warehouse</strong>${showDrive && backAt !== null ? ` <small>~ ${clock(backAt)}</small>` : ''}</div>
+          </div>
+        </li>`);
+    }
+
+    $('pv-list').innerHTML = items.join('');
+
+    $('pv-sum').textContent =
+      `· ${stops.length} deliver${stops.length === 1 ? 'y' : 'ies'}` +
+      (showDrive && totalDrive ? ` · driving ${minutesText(totalDrive)} · ${Math.round(totalKm)} km` : '') +
+      (showDrive && leaveAt !== null && backAt !== null ? ` · ${clock(leaveAt)} → ${clock(backAt)}` : '') +
+      (flags ? ` · 🚩 ${flags}` : '');
+
+    drawMap(stops, legs, wh);
+
+  }
+
+
+  // ---- map (Leaflet + OpenStreetMap, loaded only when needed) ----
+
+  let leafletPromise = null;
+
+  function loadLeaflet() {
+
+    if (window.L) return Promise.resolve();
+    if (leafletPromise) return leafletPromise;
+
+    const sources = [
+      'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/',
+      'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/'
+    ];
+
+    const tryLoad = base => new Promise((resolve, reject) => {
+      const css = document.createElement('link');
+      css.rel = 'stylesheet';
+      css.href = base + 'leaflet.css';
+      document.head.appendChild(css);
+      const js = document.createElement('script');
+      js.src = base + 'leaflet.js';
+      js.onload = resolve;
+      js.onerror = reject;
+      document.head.appendChild(js);
+    });
+
+    leafletPromise = tryLoad(sources[0]).catch(() => tryLoad(sources[1]));
+    leafletPromise.catch(() => { leafletPromise = null; });
+
+    return leafletPromise;
+
+  }
+
+
+  let map = null;
+  let mapLayer = null;
+
+  function mapMessage(text) {
+    const msg = $('pv-map-msg');
+    msg.textContent = text;
+    msg.classList.toggle('hidden', !text);
+  }
+
+
+  async function drawMap(stops, legs, wh) {
+
+    // coordinates come from the driving legs (start / end points)
+    const places = stops.map(s => mapsPlace(s.ev));
+    const chain = wh ? [wh, ...places, wh] : places;
+    const coord = {};
+    const paths = [];
+
+    for (let k = 1; k < chain.length; k++) {
+      const leg = chain[k - 1] && chain[k] ? legs[chain[k - 1] + '→' + chain[k]] : null;
+      if (!leg) continue;
+      if (leg.a) coord[chain[k - 1]] = coord[chain[k - 1]] || leg.a;
+      if (leg.b) coord[chain[k]] = coord[chain[k]] || leg.b;
+      if (leg.poly) paths.push({ line: decodePolyline(leg.poly), dashed: false });
+      else if (leg.a && leg.b) paths.push({ line: [leg.a, leg.b], dashed: true });
+    }
+
+    if (!Object.keys(coord).length) {
+      if (map) { mapLayer.clearLayers(); }
+      mapMessage('The map appears once the driving times are calculated (Apps Script).');
+      return;
+    }
+
+    try {
+      await loadLeaflet();
+    } catch {
+      mapMessage('Map could not be loaded (no internet?). Use "Open route in Maps".');
+      return;
+    }
+
+    mapMessage('');
+
+    if (!map) {
+      map = L.map('pv-map', { scrollWheelZoom: false });
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 18,
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+      mapLayer = L.layerGroup().addTo(map);
+    }
+
+    mapLayer.clearLayers();
+
+    const color = safeHex((stops[0] && stops[0].ev.colorHex) || routeHex);
+    const bounds = [];
+
+    for (const p of paths) {
+      L.polyline(p.line, { color, weight: 4, opacity: .8, dashArray: p.dashed ? '6 8' : null }).addTo(mapLayer);
+      bounds.push(...p.line);
+    }
+
+    const pin = (latlng, text, bg, title) => {
+      L.marker(latlng, {
+        title,
+        icon: L.divIcon({
+          className: '',
+          html: `<div class="pv-pin" style="background:${bg}">${escapeHtml(text)}</div>`,
+          iconSize: [24, 24],
+          iconAnchor: [12, 12]
+        })
+      }).addTo(mapLayer);
+      bounds.push(latlng);
+    };
+
+    if (wh && coord[wh]) pin(coord[wh], 'W', '#2b2b2b', 'Warehouse');
+
+    places.forEach((pl, k) => {
+      if (pl && coord[pl]) pin(coord[pl], String(k + 1), safeHex(stops[k].ev.colorHex), stops[k].ev.title || '');
+    });
+
+    if (bounds.length) map.fitBounds(bounds, { padding: [24, 24], maxZoom: 13 });
+
+    setTimeout(() => map && map.invalidateSize(), 50);
+
+  }
+
+
+  // =========================================
+  // DELIVERY DURATION (admin)
   // =========================================
 
   async function onDuration(i) {
@@ -1525,8 +2129,12 @@
   // =========================================
 
   function openCard(i) {
+    openCardEv(rowEvents[i]);
+  }
 
-    const ev = rowEvents[i];
+
+  function openCardEv(ev) {
+
     if (!ev) return;
 
     const [y, m, d] = (ev.date || '').split('-').map(Number);
@@ -1542,9 +2150,10 @@
     $('cm-when').textContent = [dateText, timeLabel(ev)].filter(Boolean).join(' · ');
     $('cm-title').textContent = ev.title || '';
 
-    $('cm-loc-block').classList.toggle('hidden', !ev.location);
-    $('cm-loc').textContent = ev.location || '';
-    $('cm-map').href = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(ev.location || '');
+    const where = mapsPlace(ev);
+    $('cm-loc-block').classList.toggle('hidden', !where);
+    $('cm-loc').textContent = ev.location || (ev.place ? ev.place + ' (area from the title)' : '');
+    $('cm-map').href = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(where);
 
     const desc = descriptionText(ev.description);
     $('cm-desc-block').classList.toggle('hidden', !desc);
@@ -1592,10 +2201,15 @@
 
     const d = sheetIsoDate();
     const answered = rows.filter(r => rowDur[r.i] && rowDur[r.i].duration).length;
+    const flagCount = rows.filter(r => {
+      const p = plannedOf(rowEvents[r.i]);
+      return p && rowDur[r.i] && rowDur[r.i].duration && rowDur[r.i].duration !== p;
+    }).length;
 
     $('ans-sub').textContent =
       `${d ? d.split('-').reverse().join('/') : ''} · ${currentRoute || 'no route'} · ` +
       `${answered} of ${rows.length} deliveries with duration · ${answersCache.length} answer${answersCache.length === 1 ? '' : 's'}` +
+      (flagCount ? ` · 🚩 ${flagCount} to check with the driver` : '') +
       (sheetStatus === 'closed' ? ` · closed by ${sheetInfo.closedBy}` : ' · day still open');
 
     $('ans-body').innerHTML = rows.map(({ i, key }) => {
@@ -1604,14 +2218,18 @@
       const title = ev ? `${timeLabel(ev)} · ${ev.title}` : rowRefText({ kind: field(i, 'kind').value, number: field(i, 'number').value.trim(), event: null });
       const dur = rowDur[i];
       const hist = answersCache.filter(a => a.key === key);
+      const planned = plannedOf(ev);
+      const flagged = planned && dur && dur.duration && planned !== dur.duration;
 
       return `
         <div class="ans-item">
           <div class="ans-head">
             <strong>${escapeHtml(title)}</strong>
+            ${planned ? `<small class="answers-sub" style="margin:0">Planned ${escapeHtml(minutesText(planned))}</small>` : ''}
             ${dur && dur.duration
               ? `<span class="ans-final">${escapeHtml(durationLabel(dur.duration))}</span>`
               : '<span class="ans-final none">No duration</span>'}
+            ${flagged ? `<span class="flag">🚩 ${dur.duration > planned ? '+' : '−'}${escapeHtml(minutesText(Math.abs(dur.duration - planned)))}</span>` : ''}
           </div>
           ${hist.length ? `<ul class="ans-hist">${hist.map(a => `
             <li>${escapeHtml(shortTime(a.at))} · ${escapeHtml(a.name)}${a.admin ? ' (admin)' : ''} → ${a.minutes ? escapeHtml(durationLabel(a.minutes)) : 'cleared'}</li>`).join('')}
@@ -1630,7 +2248,7 @@
     const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const date = sheetIsoDate();
 
-    const lines = [['Date', 'Route', 'Delivery', 'PP / OS', 'Final duration (min)', 'Answer by', 'Answer (min)', 'Answered at'].map(q).join(',')];
+    const lines = [['Date', 'Route', 'Delivery', 'PP / OS', 'Planned (min)', 'Final duration (min)', 'Difference (min)', 'Red flag', 'Answer by', 'Answer (min)', 'Answered at'].map(q).join(',')];
 
     for (let i = 0; i < ROWS; i++) {
 
@@ -1642,13 +2260,17 @@
       const title = ev ? ev.title : '';
       const final = rowDur[i] && rowDur[i].duration ? rowDur[i].duration : '';
       const hist = answersCache.filter(a => a.key === key);
+      const planned = plannedOf(ev) || '';
+      const diff = planned && final ? final - planned : '';
+      const flag = planned && final && diff !== 0 ? 'YES' : '';
+      const base = [date, currentRoute, title, ref, planned, final, diff, flag];
 
       if (!hist.length) {
-        lines.push([date, currentRoute, title, ref, final, '', '', ''].map(q).join(','));
+        lines.push([...base, '', '', ''].map(q).join(','));
       }
 
       for (const a of hist) {
-        lines.push([date, currentRoute, title, ref, final, a.name, a.minutes ?? '', new Date(a.at).toLocaleString('en-GB')].map(q).join(','));
+        lines.push([...base, a.name, a.minutes ?? '', new Date(a.at).toLocaleString('en-GB')].map(q).join(','));
       }
 
     }
@@ -1677,6 +2299,7 @@
     if (!calDate) {
       dayEvents = [];
       routes = [];
+      dayLegs = {};
       renderRoute();
       for (let i = 0; i < ROWS; i++) linkRow(i);
       renderRows();
@@ -1693,6 +2316,8 @@
 
       calColor = data.calendarColor || '';
       syncedAt = data.syncedAt || null;
+      dayLegs = data.legs || {};
+      warehouse = data.warehouse || '';
       dayEvents = (data.events || []).filter(ev => !isIgnored(ev)).map(prepareEvent);
 
       buildRoutes();
@@ -1752,6 +2377,7 @@
       route: currentRoute,
       routeHex: currentRoute ? routeHex : '',
       rows,
+      plan: buildPlan(),
       signOut: $('sign-out').value.trim(),
       signIn: $('sign-in').value.trim()
     };
@@ -1778,6 +2404,7 @@
 
     sheetStatus = sheet.status || 'open';
     sheetInfo = { closedBy: sheet.closedBy, closedAt: sheet.closedAt, updatedAt: sheet.updatedAt };
+    sheetPlan = sheet.plan || null;
 
     const rows = sheet.rows || [];
 
@@ -1859,7 +2486,8 @@
       const done = s.deliveries && s.answered === s.deliveries;
       const pill = s.status === 'closed'
         ? '<span class="pill closed">Closed</span>'
-        : `<span class="pill ${done ? 'done' : ''}">${s.answered || 0}/${s.deliveries || 0} durations</span>`;
+        : isAdmin ? `<span class="pill ${done ? 'done' : ''}">${s.answered || 0}/${s.deliveries || 0} durations</span>` : '';
+      const flagPill = isAdmin && s.flags ? ` <span class="flag">🚩 ${s.flags}</span>` : '';
 
       return `
         <li class="${s.id === currentId && sheetSaved ? 'current' : ''}">
@@ -1867,7 +2495,7 @@
             <strong>${escapeHtml(s.date?.text || 'No date')}</strong>
             ${s.day ? '· ' + escapeHtml(s.day) : ''}
             ${s.route ? `· <span class="dot" style="--c:${safeHex(s.routeHex)}"></span> ${escapeHtml(s.route)}` : ''}
-            ${pill}
+            ${pill}${flagPill}
             <br><small>Last saved by ${escapeHtml(s.updatedBy)} · ${new Date(s.updatedAt).toLocaleString('en-GB')}</small>
           </span>
           <button type="button" data-open="${escapeHtml(s.id)}">Open</button>
@@ -2218,6 +2846,15 @@
     const i = Number(t.dataset.row);
     linkRow(i);
     renderCardCell(i);
+  });
+
+  $('pv-list').addEventListener('click', e => {
+    const b = e.target.closest('[data-pv]');
+    if (b) openCardEv(previewEvents[Number(b.dataset.pv)]);
+  });
+
+  $('preview').addEventListener('toggle', () => {
+    if ($('preview').open && map) setTimeout(() => map.invalidateSize(), 50);
   });
 
   $('rows').addEventListener('click', e => {
