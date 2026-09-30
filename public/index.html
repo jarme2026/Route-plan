@@ -369,6 +369,16 @@
   .travel.back { margin: 3px 0 0; }
   .travel.missing { color: var(--muted); background: #f1f2f4; }
 
+  .area-btn {
+    font-size: 12px;
+    padding: 1px 8px;
+    margin: 0 0 3px;
+    border-radius: 5px;
+    border: 1px solid #e0b400;
+    background: #fff8dc;
+    color: #5a4a00;
+  }
+
   a.btn { text-decoration: none; display: inline-block; }
   #route-drive { font-weight: 700; color: var(--ink); }
 
@@ -686,6 +696,7 @@
       <span class="label">Address</span>
       <div id="cm-loc"></div>
       <a id="cm-map" target="_blank" rel="noopener">Open in Google Maps</a>
+      <button type="button" class="small admin-only" id="cm-area" style="margin-left:8px">📍 Change area</button>
     </div>
     <div class="cm-block" id="cm-desc-block">
       <span class="label">Event details</span>
@@ -768,7 +779,8 @@
       <select id="route" class="admin-only" aria-label="Route"><option value="">Choose the date first</option></select>
       <span id="route-name" class="basic-only"></span>
       <button type="button" class="small admin-only" id="route-fill" title="Put every event of this route on the sheet">Fill all</button>
-      <button type="button" class="small admin-only" id="route-refresh" title="Reload the calendar">Refresh</button>
+      <button type="button" class="small admin-only" id="route-sync" title="Read Google Calendar now (opens the Apps Script in a new tab)">⟳ Sync calendar</button>
+      <button type="button" class="small admin-only" id="route-refresh" title="Reload what was last synced">Refresh</button>
       <a class="btn small hidden" id="route-map" target="_blank" rel="noopener">Open route in Maps</a>
       <small id="route-drive" class="admin-only"></small>
       <small id="cal-synced" class="admin-only"></small>
@@ -1195,6 +1207,8 @@
   let dayLegs = {};                // driving times of the day: { "from→to": { minutes, km } }
   let warehouse = '';              // van start / end (from the Apps Script)
   let whCoords = '';               // warehouse "lat,lng" (from the Apps Script)
+  let syncUrl = '';                // Apps Script web app (manual sync)
+  let syncPending = null;          // syncedAt before the admin pressed "Sync calendar"
   let travel = [];                 // per row: { from, leg, back } (admin)
   let sheetPlan = null;            // route saved with the sheet (legs + warehouse)
   let currentRoute = '';           // route name (colour)
@@ -1422,6 +1436,7 @@
 
     $('route-fill').disabled = !adminEdit || !routes.some(r => r.name === currentRoute);
     $('route-refresh').disabled = !adminEdit;
+    $('route-sync').disabled = !isAdmin;
     $('btn-save').disabled = closed;
 
     document.querySelectorAll('[data-field=pick], [data-field=kind], [data-field=number]')
@@ -1666,12 +1681,14 @@
 
     let before = '';
 
+    const areaBtn = `<button type="button" class="area-btn" data-area="${i}" title="Type the area or Eircode Google Maps should use">📍 Set area${t.place ? ' (now: ' + escapeHtml(t.place) + ')' : ''}</button>`;
+
     if (t.noPlace) {
-      before = '<span class="travel missing">🚐 No place found for Maps</span>';
+      before = '<span class="travel missing">🚐 No place found for Maps</span>' + areaBtn;
     } else if (t.label) {
       before = t.leg && t.leg.minutes !== null
         ? `<span class="travel"${marginTitle(t.leg)}>🚐 ${escapeHtml(minutesText(t.leg.minutes))} · ${t.leg.km} km <small>${escapeHtml(t.label)}</small></span>`
-        : `<span class="travel missing">🚐 Driving time not calculated yet <small>${escapeHtml(t.label)}</small></span>`;
+        : `<span class="travel missing">🚐 Driving time not calculated yet <small>${escapeHtml(t.label)}</small></span>` + areaBtn;
     }
 
     let after = '';
@@ -1926,6 +1943,113 @@
     setStatus(
       `${placed} added from ${currentRoute}` + (noRoom ? ` · ${noRoom} did not fit (sheet full)` : '') + ' – remember to Save',
       noRoom ? 'err' : 'ok'
+    );
+
+  }
+
+
+  // =========================================
+  // MANUAL CALENDAR SYNC (admin)
+  // =========================================
+
+  // Opens the Apps Script web app in a new tab (it runs with the admin's Google login).
+  // When the admin comes back to this tab, the calendar is reloaded once.
+  function syncCalendar() {
+
+    if (!syncUrl) {
+      alert(
+        'The Sync button is not set up yet.\n\n' +
+        '1. In Apps Script: Deploy → New deployment → Web app\n' +
+        '   Execute as: Me · Who has access: Anyone within BoConcept Dublin\n' +
+        '2. ▶ Run "atualizarPlanilha" once in the editor.\n\n' +
+        'After that this button works from here.'
+      );
+      return;
+    }
+
+    syncPending = syncedAt || '';
+    window.open(syncUrl, 'route-plan-sync');
+    setStatus('Syncing in the new tab… come back here when it says "Calendar synced"');
+
+  }
+
+
+  async function afterSync() {
+
+    if (syncPending === null || !isAdmin) return;
+
+    const before = syncPending;
+    syncPending = null;
+
+    if (!sheetIsoDate()) {
+      setStatus('Sync done in the other tab – choose a date to see the events', 'ok');
+      return;
+    }
+
+    await loadCalendar();
+
+    if (syncedAt && syncedAt !== before) {
+      setStatus('Calendar synced ' + new Date(syncedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + ' – remember to Save', 'ok');
+    } else {
+      syncPending = before;   // not finished yet: check again next time the tab gets focus
+      setStatus('Sync still running – come back to this tab again in a few seconds (or press Refresh)', 'err');
+    }
+
+  }
+
+
+  // =========================================
+  // AREA FOR GOOGLE MAPS (admin)
+  // =========================================
+
+  // The admin types the area / Eircode of a delivery. It is saved on the website and
+  // the Apps Script uses it on the next sync (within 5 minutes) to work out the driving time.
+  async function setArea(ev) {
+
+    if (!isAdmin || !ev || ev.lunch || !ev.date) return;
+
+    const current = mapsPlace(ev);
+    const typed = prompt(
+      'Area or Eircode for Google Maps\n(e.g. "Dundrum", "Blackrock, Co. Dublin", "D16 X2Y3")\n\n' +
+      ev.title + '\n\nLeave empty to go back to the area from the title.',
+      current
+    );
+
+    if (typed === null) return;
+
+    const place = typed.trim();
+
+    try {
+
+      await api('/api/places', {
+        method: 'PUT',
+        body: JSON.stringify({ date: ev.date, title: ev.title, place })
+      });
+
+    } catch (err) {
+
+      setStatus('Area not saved: ' + err.message, 'err');
+      return;
+
+    }
+
+    // update every copy of this event on the page
+    const same = e => e && !e.lunch && e.date === ev.date && String(e.title || '').trim() === String(ev.title || '').trim();
+    const apply = e => {
+      e.place = place;        // '' -> back to the area from the title
+      e.coords = '';          // old map point no longer valid
+      e.areaSet = !!place;
+    };
+
+    dayEvents.filter(same).forEach(apply);
+    rowEvents.filter(same).forEach(apply);
+    if (same(cardEvent)) apply(cardEvent);
+
+    renderRows();
+
+    setStatus(
+      (place ? `Area "${place}" saved` : 'Area removed') +
+      ' – press ⟳ Sync calendar to work out the driving times, then Save', 'ok'
     );
 
   }
@@ -2303,9 +2427,13 @@
   }
 
 
+  let cardEvent = null;
+
   function openCardEv(ev) {
 
     if (!ev) return;
+
+    cardEvent = ev;
 
     const [y, m, d] = (ev.date || '').split('-').map(Number);
     const dateText = y
@@ -2321,7 +2449,8 @@
     $('cm-title').textContent = ev.title || '';
 
     const where = mapsPlace(ev);
-    $('cm-loc-block').classList.toggle('hidden', !where);
+    $('cm-loc-block').classList.toggle('hidden', !where && !isAdmin);
+    $('cm-area').classList.toggle('hidden', !!ev.lunch || !ev.date);
     $('cm-loc').textContent = ev.location || (where ? where + ' (area from the title)' : '');
     $('cm-map').href = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(where);
 
@@ -2489,6 +2618,7 @@
       dayLegs = data.legs || {};
       warehouse = data.warehouse || '';
       whCoords = data.warehouseCoords || '';
+      syncUrl = data.syncUrl || '';
       dayEvents = (data.events || []).filter(ev => !isIgnored(ev)).map(prepareEvent);
 
       buildRoutes();
@@ -2975,7 +3105,17 @@
   });
 
   $('route-fill').addEventListener('click', fillRoute);
-  $('route-refresh').addEventListener('click', loadCalendar);
+  $('route-refresh').addEventListener('click', async () => {
+    await loadCalendar();
+    if (syncPending !== null && syncedAt && syncedAt !== syncPending) {
+      syncPending = null;
+      setStatus('Calendar synced ' + new Date(syncedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + ' – remember to Save', 'ok');
+    }
+  });
+  $('route-sync').addEventListener('click', syncCalendar);
+
+  // back from the sync tab -> reload the calendar once
+  window.addEventListener('focus', () => setTimeout(afterSync, 400));
 
   $('btn-save').addEventListener('click', save);
   $('btn-new').addEventListener('click', () => {
@@ -3028,7 +3168,15 @@
     if ($('preview').open && map) setTimeout(() => map.invalidateSize(), 50);
   });
 
+  $('cm-area').addEventListener('click', async () => {
+    const ev = cardEvent;
+    closeModals();
+    await setArea(ev);
+  });
+
   $('rows').addEventListener('click', e => {
+    const area = e.target.closest('[data-area]');
+    if (area) { setArea(rowEvents[Number(area.dataset.area)]); return; }
     const card = e.target.closest('[data-card]');
     if (card) openCard(Number(card.dataset.card));
   });
