@@ -31,6 +31,9 @@ Digital delivery sheet fed by Google Calendar, served by a Cloudflare Worker.
   calendar times are not used. For each stop: drive → arrive → delivery time → leave → next drive.
   Delivery time = the Delivery duration chosen, otherwise the planned time (calendar event length).
 - Lunch: option in the PP / OS dropdown (once per sheet), adds 30 minutes at that point, no driving.
+- The Apps Script also sends the exact point ("lat,lng") of every delivery and of the warehouse:
+  the "Open route in Maps" button and the map pins use it, so Maps never has to guess
+  ("Dublin 16, Ireland"). Driving times and points cover the same 21 days as the sync.
 - Places are looked up preferring the Dublin / Leinster area (AREA_PREFERIDA in the Apps Script),
   so "Blackrock" is Blackrock, Co. Dublin, not Cork.
 - Driving times shown = Google Maps time + 15 min margin, rounded up to the next 15 min
