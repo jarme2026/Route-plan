@@ -5,8 +5,8 @@
 // Sheets, duration answers, calendar and access log kept in one Durable Object
 //
 // Access:
-//   Admin  -> password (secret ADMIN_PASSWORD): date, route, events, close the day
-//   Basic  -> name only: sees the deliveries and picks the delivery duration
+//   Admin  -> password (secret ADMIN_PASSWORD): date, route, events, durations, close the day
+//   Basic  -> name only: sees the route preview (read only)
 // =========================================
 
 
@@ -77,6 +77,77 @@ async function isAdmin(request, env) {
 }
 
 
+// [lat, lng] or null
+function point(p) {
+
+  return Array.isArray(p) && p.length === 2 && p.every(Number.isFinite)
+    ? [p[0], p[1]]
+    : null;
+
+}
+
+
+// One driving leg: time, distance and map data
+function cleanLeg(l) {
+
+  return {
+    minutes: Number.isFinite(l?.minutes) ? l.minutes : null,
+    km: Number.isFinite(l?.km) ? l.km : null,
+    a: point(l?.a),
+    b: point(l?.b),
+    poly: typeof l?.poly === 'string' ? l.poly.slice(0, 20000) : ''
+  };
+
+}
+
+
+// Planned minutes of a delivery = length of its calendar event
+function plannedMinutes(ev) {
+
+  if (!ev || ev.allDay || !ev.start || !ev.end) return null;
+
+  const m = t => {
+    const [h, mi] = String(t).split(':').map(Number);
+    return h * 60 + mi;
+  };
+
+  const d = m(ev.end) - m(ev.start);
+
+  return Number.isFinite(d) && d > 0 ? d : null;
+
+}
+
+
+// Route saved with the sheet (so the team sees the preview without calendar access)
+function cleanPlan(plan) {
+
+  if (!plan || typeof plan !== 'object') return null;
+
+  const legs = {};
+
+  for (const [k, l] of Object.entries(plan.legs || {}).slice(0, 60)) {
+
+    legs[String(k).slice(0, 420)] = cleanLeg(l);
+
+  }
+
+  const out = {
+    warehouse: String(plan.warehouse || '').slice(0, 200),
+    legs
+  };
+
+  // keep it small: drop the road paths if too big
+  if (JSON.stringify(out).length > 300000) {
+
+    for (const l of Object.values(out.legs)) l.poly = '';
+
+  }
+
+  return out;
+
+}
+
+
 // Short summary of a sheet for the list
 function summary(sheet) {
 
@@ -92,6 +163,10 @@ function summary(sheet) {
     status: sheet.status || 'open',
     deliveries: rows.length,
     answered: rows.filter(r => r.duration).length,
+    flags: rows.filter(r => {
+      const planned = plannedMinutes(r.event);
+      return r.duration && planned && r.duration !== planned;
+    }).length,
     createdBy: sheet.createdBy,
     updatedBy: sheet.updatedBy,
     updatedAt: sheet.updatedAt,
@@ -166,12 +241,26 @@ export class SheetStore {
           colorId: clean(ev.colorId, 3),
           kind: ev.kind === 'OS' ? 'OS' : (ev.kind === 'PP' ? 'PP' : ''),
           number: clean(ev.number, 30),
+          place: clean(ev.place, 200),
           minutes: Number(ev.minutes) || 0
         };
 
         if (!/^\d{4}-\d{2}-\d{2}$/.test(e.date)) continue;
 
         (byDay[e.date] ||= []).push(e);
+
+      }
+
+      // driving times between places, per day: { "from→to": { minutes, km } }
+      const legsByDay = {};
+
+      for (const l of (Array.isArray(body.legs) ? body.legs : []).slice(0, 3000)) {
+
+        const date = clean(l.date, 10);
+
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+
+        (legsByDay[date] ||= {})[clean(l.from, 200) + '→' + clean(l.to, 200)] = cleanLeg(l);
 
       }
 
@@ -193,8 +282,21 @@ export class SheetStore {
 
       }
 
-      const stale =
-        (previous.days || []).filter(d => !byDay[d]).map(d => 'cal:' + d);
+      const legEntries =
+        Object.entries(legsByDay);
+
+      for (let i = 0; i < legEntries.length; i += 100) {
+
+        await storage.put(
+          Object.fromEntries(legEntries.slice(i, i + 100).map(([d, legs]) => ['legs:' + d, legs]))
+        );
+
+      }
+
+      const stale = [
+        ...(previous.days || []).filter(d => !byDay[d]).map(d => 'cal:' + d),
+        ...(previous.legDays || []).filter(d => !legsByDay[d]).map(d => 'legs:' + d)
+      ];
 
       for (let i = 0; i < stale.length; i += 100) {
 
@@ -208,7 +310,9 @@ export class SheetStore {
       await storage.put('calendar-meta', {
         syncedAt: new Date().toISOString(),
         calendarColor,
-        days
+        warehouse: clean(body.warehouse, 200),
+        days,
+        legDays: Object.keys(legsByDay)
       });
 
       await storage.delete('calendar');   // old single-key format
@@ -216,7 +320,8 @@ export class SheetStore {
       return json({
         ok: true,
         count: entries.reduce((n, [, evs]) => n + evs.length, 0),
-        days: days.length
+        days: days.length,
+        legs: legEntries.reduce((n, [, legs]) => n + Object.keys(legs).length, 0)
       });
 
     }
@@ -312,6 +417,8 @@ export class SheetStore {
       return json({
         syncedAt: meta.syncedAt || null,
         calendarColor: meta.calendarColor || '',
+        warehouse: meta.warehouse || '',
+        legs: (await storage.get('legs:' + date)) || {},
         date,
         events
       });
@@ -445,6 +552,7 @@ export class SheetStore {
           rows,
           signOut: String(body.signOut || '').slice(0, 100),
           signIn: String(body.signIn || '').slice(0, 100),
+          plan: cleanPlan(body.plan),
           status: 'open',
           createdBy: previous?.createdBy || name,
           createdAt: previous?.createdAt || now,
@@ -470,9 +578,11 @@ export class SheetStore {
       }
 
 
-      // ---------- delivery duration (everyone) ----------
+      // ---------- delivery duration (admin) ----------
 
       if (action === 'duration' && method === 'POST') {
+
+        if (!admin) return json({ error: 'Admin only' }, 403);
 
         const body =
           await request.json().catch(() => ({}));
