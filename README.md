@@ -34,6 +34,10 @@ Digital delivery sheet fed by Google Calendar, served by a Cloudflare Worker.
 - The Apps Script also sends the exact point ("lat,lng") of every delivery and of the warehouse:
   the "Open route in Maps" button and the map pins use it, so Maps never has to guess
   ("Dublin 16, Ireland"). Driving times and points cover the same 21 days as the sync.
+- Set area (admin): when a delivery shows "Driving time not calculated yet" or "No place found",
+  the admin clicks "📍 Set area" (or "📍 Change area" in the delivery card) and types the area /
+  Eircode. It is saved on the website (key: date + event title); the Apps Script reads it on the
+  next sync (GET /api/calendar/overrides, sync key) and works out the driving times with it.
 - Places are looked up preferring the Dublin / Leinster area (AREA_PREFERIDA in the Apps Script),
   so "Blackrock" is Blackrock, Co. Dublin, not Cork.
 - Driving times shown = Google Maps time + 15 min margin, rounded up to the next 15 min
@@ -50,6 +54,17 @@ Digital delivery sheet fed by Google Calendar, served by a Cloudflare Worker.
 - Columns: Delivery (event card) · PP / OS (all numbers found in the event) · Delivery duration
   (30 minutes → 6 hours, 15-minute steps).
 - Mobile: each delivery is a numbered block.
+
+## Calendar sync (manual)
+
+- No automatic trigger. The admin presses "⟳ Sync calendar" in the route bar: it opens the Apps
+  Script web app in a new tab (runs with the admin's Google login), which reads Google Calendar,
+  works out the driving times and sends everything to the Worker. Back on the site, the calendar
+  is reloaded once. Cloudflare: 2 requests per sync, nothing when nobody syncs.
+- The Apps Script sends its own web app address with each sync, so the button needs no setup
+  on the website – only a first ▶ Run of "atualizarPlanilha" after deploying the web app.
+- Web app deployment: Execute as Me · Who has access: Anyone within BoConcept Dublin.
+  To update the script keep the same address: Manage deployments → ✏️ → New version.
 
 ## Driving times (admin only)
 
@@ -85,6 +100,8 @@ wrangler.jsonc         Cloudflare config
 | POST | /api/sheets/:id/close · /reopen | admin |
 | GET | /api/calendar?date=YYYY-MM-DD | admin |
 | POST | /api/calendar/sync | Google Apps Script (header `x-sync-key` = `SYNC_TOKEN`) |
+| GET | /api/calendar/overrides | Google Apps Script (areas set by the admin) |
+| PUT | /api/places | admin (set / clear the area of a delivery) |
 
 ## Secrets (Cloudflare → Settings → Variables and Secrets)
 
