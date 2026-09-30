@@ -1090,22 +1090,23 @@
     if (isAdmin) {
       return {
         legs: { ...(saved.legs || {}), ...dayLegs },
-        wh: warehouse || saved.warehouse || ''
+        wh: warehouse || saved.warehouse || '',
+        whc: whCoords || saved.warehouseCoords || ''
       };
     }
-    return { legs: saved.legs || {}, wh: saved.warehouse || '' };
+    return { legs: saved.legs || {}, wh: saved.warehouse || '', whc: saved.warehouseCoords || '' };
   }
 
   // Same legs with the margin applied (used for every time shown / added up)
   function legsSource() {
-    const { legs, wh } = rawLegsSource();
+    const { legs, wh, whc } = rawLegsSource();
     const out = {};
     for (const [k, l] of Object.entries(legs)) {
       out[k] = l && l.minutes !== null && l.minutes !== undefined
         ? { ...l, minutes: withMargin(l.minutes), maps: l.minutes }
         : l;
     }
-    return { legs: out, wh };
+    return { legs: out, wh, whc };
   }
 
   // tooltip: where the number comes from
@@ -1152,6 +1153,13 @@
     return ev.place || placeFromEvent(ev) || '';
   }
 
+  // What Google Maps gets: the exact point found by the Apps Script ("lat,lng"),
+  // otherwise the place text ("Dublin 16, Ireland" is not always found by Maps)
+  function mapsTarget(ev) {
+    if (!ev || ev.lunch) return '';
+    return ev.coords || mapsPlace(ev);
+  }
+
   function lunchEvent() {
     return { lunch: true, title: 'Lunch', minutes: LUNCH_MIN };
   }
@@ -1186,6 +1194,7 @@
   let routes = [];                 // [{ name, hex, events: [...] }]
   let dayLegs = {};                // driving times of the day: { "from→to": { minutes, km } }
   let warehouse = '';              // van start / end (from the Apps Script)
+  let whCoords = '';               // warehouse "lat,lng" (from the Apps Script)
   let travel = [];                 // per row: { from, leg, back } (admin)
   let sheetPlan = null;            // route saved with the sheet (legs + warehouse)
   let currentRoute = '';           // route name (colour)
@@ -1257,7 +1266,7 @@
     const c = colorOf(ev);
     return {
       date: ev.date, start: ev.start, end: ev.end, allDay: !!ev.allDay,
-      title: ev.title, location: ev.location, place: ev.place || '', description: ev.description || '',
+      title: ev.title, location: ev.location, place: ev.place || '', coords: ev.coords || '', description: ev.description || '',
       kind: ev.kind, number: ev.number, refs: ev.refs || [], colorName: c.name, colorHex: c.hex
     };
   }
@@ -1948,7 +1957,7 @@
   // Legs to save with the sheet: only the ones this route uses
   function buildPlan() {
 
-    const { legs, wh } = rawLegsSource();
+    const { legs, wh, whc } = rawLegsSource();
     const places = [];
 
     for (let i = 0; i < ROWS; i++) {
@@ -1963,7 +1972,7 @@
       if (legs[key]) used[key] = legs[key];
     }
 
-    return { warehouse: wh, legs: used };
+    return { warehouse: wh, warehouseCoords: whc, legs: used };
 
   }
 
@@ -1993,14 +2002,16 @@
       : !currentRoute ? 'Choose a route to see the preview.'
       : 'No deliveries on this route.';
 
-    // Google Maps link (everyone)
-    const places = stops.map(s => mapsPlace(s.ev)).filter(Boolean);
+    // Google Maps link (everyone) – exact points when known
+    const { whc } = legsSource();
+    const places = stops.map(s => mapsTarget(s.ev)).filter(Boolean);
     const link = $('route-map');
+    const home = whc || wh;
 
     if (places.length) {
-      const origin = wh || places[0];
-      const destination = wh || places[places.length - 1];
-      const waypoints = wh ? places : places.slice(1, -1);
+      const origin = home || places[0];
+      const destination = home || places[places.length - 1];
+      const waypoints = home ? places : places.slice(1, -1);
       link.href = 'https://www.google.com/maps/dir/?api=1&travelmode=driving' +
         '&origin=' + encodeURIComponent(origin) +
         '&destination=' + encodeURIComponent(destination) +
@@ -2154,9 +2165,21 @@
       else if (leg.a && leg.b) paths.push({ line: [leg.a, leg.b], dashed: true });
     }
 
+    // exact points from the Apps Script (map shows the stops even before driving times exist)
+    const asPoint = v => {
+      const m = String(v || '').match(/^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/);
+      return m ? [Number(m[1]), Number(m[2])] : null;
+    };
+    const { whc } = legsSource();
+    if (wh && !coord[wh] && asPoint(whc)) coord[wh] = asPoint(whc);
+    stops.forEach(s => {
+      const pl = mapsPlace(s.ev);
+      if (pl && !coord[pl] && asPoint(s.ev.coords)) coord[pl] = asPoint(s.ev.coords);
+    });
+
     if (!Object.keys(coord).length) {
       if (map) { mapLayer.clearLayers(); }
-      mapMessage('The map appears once the driving times are calculated (Apps Script).');
+      mapMessage('The map appears once the Apps Script has found the places (next sync).');
       return;
     }
 
@@ -2465,6 +2488,7 @@
       syncedAt = data.syncedAt || null;
       dayLegs = data.legs || {};
       warehouse = data.warehouse || '';
+      whCoords = data.warehouseCoords || '';
       dayEvents = (data.events || []).filter(ev => !isIgnored(ev)).map(prepareEvent);
 
       buildRoutes();
