@@ -873,9 +873,9 @@
 
   const MANUAL = '__manual';
 
-  // Driving time margin: Google Maps time + 05 min, rounded UP to the next 15 min
+  // Driving time margin: Google Maps time + 15 min, rounded UP to the next 15 min
   // (addresses are only the area from the title, so Maps times are approximate)
-  const DRIVE_MARGIN = 05;
+  const DRIVE_MARGIN = 15;
   const DRIVE_ROUND = 15;
 
   // Every route leaves the warehouse at this time (calendar times are not used)
@@ -1690,7 +1690,7 @@
     } else if (t.label) {
       before = t.leg && t.leg.minutes !== null
         ? `<span class="travel"${marginTitle(t.leg)}>🚐 ${escapeHtml(minutesText(t.leg.minutes))} · ${t.leg.km} km <small>${escapeHtml(t.label)}</small></span>`
-        : `<span class="travel missing">🚐 Driving time not calculated yet <small>${escapeHtml(t.label)}</small></span>` + areaBtn;
+        : `<span class="travel missing" title="Save, then ⟳ Sync calendar">🚐 Driving time not calculated yet <small>${escapeHtml(t.label)} – press ⟳ Sync calendar</small></span>` + areaBtn;
     }
 
     let after = '';
@@ -1964,8 +1964,23 @@
     }
 
     syncPending = syncedAt || '';
-    window.open(syncUrl, 'route-plan-sync');
-    setStatus('Syncing in the new tab… come back here when it says "Calendar synced"');
+
+    // open the tab now (inside the click, so it isn't blocked), save, then go to the sync
+    const tab = window.open('', 'route-plan-sync');
+    const hasRows = [...Array(ROWS).keys()].some(i => rowKey(i));
+
+    const go = () => {
+      if (tab) tab.location.href = syncUrl;
+      else window.open(syncUrl, 'route-plan-sync');
+      setStatus('Syncing in the new tab… come back here when it says "Calendar synced"');
+    };
+
+    if (hasRows && sheetStatus !== 'closed') {
+      setStatus('Saving the sheet before the sync…');
+      save().finally(go);   // the sheet order tells the Apps Script which trips to work out
+    } else {
+      go();
+    }
 
   }
 
@@ -2018,7 +2033,14 @@
     await loadCalendar();
 
     if (syncedAt && syncedAt !== before) {
-      setStatus('Calendar synced ' + new Date(syncedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + ' – remember to Save', 'ok');
+      const at = new Date(syncedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      const hasRows = [...Array(ROWS).keys()].some(i => rowKey(i));
+      if (hasRows && sheetStatus !== 'closed') {
+        await save();   // the team gets the new driving times straight away
+        setStatus('Calendar synced ' + at + ' · sheet saved', 'ok');
+      } else {
+        setStatus('Calendar synced ' + at, 'ok');
+      }
     } else {
       syncPending = before;   // not finished yet: check again next time the tab gets focus
       setStatus('Sync still running – come back to this tab again in a few seconds (or press Refresh)', 'err');
@@ -2119,13 +2141,16 @@
 
     const chain = wh ? [wh, ...places, wh] : places;
     const used = {};
+    const need = [];      // trips in SHEET order the Apps Script must work out
 
     for (let k = 1; k < chain.length; k++) {
+      if (chain[k - 1] === chain[k]) continue;
       const key = chain[k - 1] + '→' + chain[k];
       if (legs[key]) used[key] = legs[key];
+      need.push([chain[k - 1], chain[k]]);
     }
 
-    return { warehouse: wh, warehouseCoords: whc, legs: used };
+    return { warehouse: wh, warehouseCoords: whc, legs: used, need };
 
   }
 
@@ -2338,6 +2363,7 @@
 
     try {
       await loadLeaflet();
+      if (!window.L) throw new Error('no Leaflet');
     } catch {
       mapMessage('Map could not be loaded (no internet?). Use "Open route in Maps".');
       return;
