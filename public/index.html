@@ -380,6 +380,14 @@
   }
 
   a.btn { text-decoration: none; display: inline-block; }
+  .card-box a.primary-link {
+    display: inline-block;
+    margin-top: 8px;
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 700;
+  }
   #route-drive { font-weight: 700; color: var(--ink); }
 
   /* team view: route preview only */
@@ -551,6 +559,8 @@
     .toolbar .user { flex: 1 0 100%; }
     .toolbar #status { order: 5; flex: 1 0 100%; min-width: 0; }
     .toolbar > button { flex: 1; padding: 8px 6px; }
+    #btn-reload, #btn-print { display: none !important; }
+    .card-box a.primary-link { display: block; text-align: center; padding: 12px; font-size: 17px; }
 
     .panel { padding: 0 8px; }
 
@@ -673,10 +683,9 @@
 <form id="gate">
   <div class="gate-card">
     <h1>route plan</h1>
-    <p>Please enter your name to continue.</p>
+    <p>Enter your name and the password.</p>
     <input id="gate-name" type="text" autocomplete="name" placeholder="Your name" maxlength="60" required>
-    <label class="check"><input type="checkbox" id="gate-admin"> I'm the admin</label>
-    <input id="gate-pass" type="password" class="hidden" placeholder="Admin password" autocomplete="current-password">
+    <input id="gate-pass" type="password" placeholder="Password" autocomplete="current-password">
     <div class="gate-error hidden" id="gate-error"></div>
     <button class="primary wide" type="submit" id="gate-enter">Enter</button>
   </div>
@@ -695,7 +704,7 @@
     <div class="cm-block" id="cm-loc-block">
       <span class="label">Address</span>
       <div id="cm-loc"></div>
-      <a id="cm-map" target="_blank" rel="noopener">Open in Google Maps</a>
+      <a id="cm-map" class="btn primary-link" target="_blank" rel="noopener">🧭 Open in Google Maps</a>
       <button type="button" class="small admin-only" id="cm-area" style="margin-left:8px">📍 Change area</button>
     </div>
     <div class="cm-block" id="cm-desc-block">
@@ -877,6 +886,9 @@
   // (addresses are only the area from the title, so Maps times are approximate)
   const DRIVE_MARGIN = 15;
   const DRIVE_ROUND = 15;
+
+  // Two deliveries in a row in the same area (e.g. two "D04"): this many minutes between them
+  const SAME_AREA_MIN = 15;
 
   // Every route leaves the warehouse at this time (calendar times are not used)
   const DEPART_TIME = '09:30';
@@ -1120,6 +1132,11 @@
         : l;
     }
     return { legs: out, wh, whc };
+  }
+
+  // " · 12.3 km" (nothing for "same area")
+  function kmText(leg) {
+    return leg && leg.km !== null && leg.km !== undefined ? ` · ${leg.km} km` : '';
   }
 
   // tooltip: where the number comes from
@@ -1597,6 +1614,11 @@
 
       if (!place) {
         uncertain = true;
+      } else if (prevPlace && prevPlace === place && k > 0) {
+        // same area as the previous delivery
+        label = 'same area';
+        leg = { minutes: SAME_AREA_MIN, km: null, sameArea: true };
+        t += leg.minutes; totalDrive += leg.minutes;
       } else if (prevPlace) {
         label = prevLabel;
         leg = legs[prevPlace + '→' + place] || null;
@@ -1689,7 +1711,7 @@
       before = '<span class="travel missing">🚐 No place found for Maps</span>' + areaBtn;
     } else if (t.label) {
       before = t.leg && t.leg.minutes !== null
-        ? `<span class="travel"${marginTitle(t.leg)}>🚐 ${escapeHtml(minutesText(t.leg.minutes))} · ${t.leg.km} km <small>${escapeHtml(t.label)}</small></span>`
+        ? `<span class="travel"${marginTitle(t.leg)}>🚐 ${escapeHtml(minutesText(t.leg.minutes))}${kmText(t.leg)} <small>${escapeHtml(t.label)}</small></span>`
         : `<span class="travel missing" title="Save, then ⟳ Sync calendar">🚐 Driving time not calculated yet <small>${escapeHtml(t.label)} – press ⟳ Sync calendar</small></span>` + areaBtn;
     }
 
@@ -1697,7 +1719,7 @@
 
     if (t.back) {
       after = t.back !== 'missing' && t.back.minutes !== null
-        ? `<span class="travel back"${marginTitle(t.back)}>↩ ${escapeHtml(minutesText(t.back.minutes))} · ${t.back.km} km back to warehouse${schedule && schedule.back !== null ? ' · ~' + clock(schedule.back) : ''}</span>`
+        ? `<span class="travel back"${marginTitle(t.back)}>↩ ${escapeHtml(minutesText(t.back.minutes))}${kmText(t.back)} back to warehouse${schedule && schedule.back !== null ? ' · ~' + clock(schedule.back) : ''}</span>`
         : '<span class="travel back missing">↩ Return time not calculated yet</span>';
     }
 
@@ -2208,7 +2230,7 @@
     const sc = buildSchedule(stops);
     const driveHtml = leg => !showDrive ? ''
       : leg && leg.minutes !== null
-        ? `<div class="pv-drive"${marginTitle(leg)}>🚐 ${escapeHtml(minutesText(leg.minutes))} · ${leg.km} km</div>`
+        ? `<div class="pv-drive"${marginTitle(leg)}>🚐 ${escapeHtml(minutesText(leg.minutes))}${leg.sameArea ? ' · same area' : kmText(leg)}</div>`
         : '<div class="pv-drive missing">🚐 driving time not calculated yet</div>';
 
     let flags = 0, n = 0;
@@ -2507,7 +2529,10 @@
     $('cm-loc-block').classList.toggle('hidden', !where && !isAdmin);
     $('cm-area').classList.toggle('hidden', !!ev.lunch || !ev.date);
     $('cm-loc').textContent = ev.location || (where ? where + ' (area from the title)' : '');
-    $('cm-map').href = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(where);
+    // directions to this delivery (exact point when known); opens the Maps app on phones
+    $('cm-map').href = 'https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=' +
+      encodeURIComponent(mapsTarget(ev) || where);
+    $('cm-map').classList.toggle('hidden', !where);
 
     const desc = descriptionText(ev.description);
     $('cm-desc-block').classList.toggle('hidden', !desc);
@@ -2826,7 +2851,18 @@
 
     const res = await fetch(path, { ...options, headers });
 
-    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
+    if (!res.ok) {
+      const msg = (await res.json().catch(() => ({}))).error || res.statusText;
+      // session no longer valid (password changed) -> back to the login
+      if (res.status === 401 && path !== '/api/admin/login' && path !== '/api/me') {
+        adminToken = '';
+        safeSet(TOKEN_KEY, '');
+        showGate();
+        $('gate-error').textContent = 'Session expired – type the password again';
+        $('gate-error').classList.remove('hidden');
+      }
+      throw new Error(msg);
+    }
 
     return res.json();
 
@@ -3051,16 +3087,15 @@
 
     $('gate').classList.remove('hidden');
     $('gate-name').value = userName;
-    $('gate-admin').checked = !!adminToken;
     $('gate-pass').value = '';
-    $('gate-pass').classList.add('hidden');
+    $('gate-pass').placeholder = adminToken ? 'Password (remembered on this device)' : 'Password';
     $('gate-error').classList.add('hidden');
-    $('gate-name').focus();
+    (userName ? $('gate-pass') : $('gate-name')).focus();
 
   }
 
 
-  async function enter(name, wantsAdmin, password) {
+  async function enter(name, password) {
 
     userName = name;
     safeSet(NAME_KEY, name);
@@ -3070,9 +3105,7 @@
       $('gate-error').classList.remove('hidden');
     };
 
-    if (!wantsAdmin) {
-      adminToken = '';
-    } else if (password) {
+    if (password) {
       try {
         const res = await api('/api/admin/login', {
           method: 'POST',
@@ -3084,27 +3117,22 @@
         return;
       }
     } else if (!adminToken) {
-      showError('Type the admin password');
-      $('gate-pass').classList.remove('hidden');
+      showError('Type the password');
       $('gate-pass').focus();
       return;
     }
 
-    // check the saved token is still valid
+    // check the password / saved session is valid (the site only opens for the admin)
     try {
       const me = await api('/api/me');
-      if (wantsAdmin && !me.admin) {
-        adminToken = '';
-        safeSet(TOKEN_KEY, '');
-        showError('Admin session expired – type the password again');
-        $('gate-pass').classList.remove('hidden');
-        $('gate-pass').focus();
-        return;
-      }
       isAdmin = !!me.admin;
       syncUrl = me.syncUrl || syncUrl;
     } catch (err) {
-      showError('Could not connect: ' + err.message);
+      adminToken = '';
+      safeSet(TOKEN_KEY, '');
+      $('gate-pass').placeholder = 'Password';
+      showError(/password/i.test(err.message) ? 'Session expired – type the password again' : 'Could not connect: ' + err.message);
+      $('gate-pass').focus();
       return;
     }
 
@@ -3134,13 +3162,7 @@
   $('gate').addEventListener('submit', e => {
     e.preventDefault();
     const name = $('gate-name').value.trim();
-    if (name) enter(name, $('gate-admin').checked, $('gate-pass').value);
-  });
-
-  $('gate-admin').addEventListener('change', () => {
-    const show = $('gate-admin').checked && !adminToken;
-    $('gate-pass').classList.toggle('hidden', !show);
-    if (show) $('gate-pass').focus();
+    if (name) enter(name, $('gate-pass').value);
   });
 
   $('change-user').addEventListener('click', showGate);
