@@ -151,10 +151,17 @@ function cleanPlan(plan) {
 
   }
 
+  // trips in sheet order still to be worked out by the Apps Script
+  const need = (Array.isArray(plan.need) ? plan.need : [])
+    .slice(0, 40)
+    .filter(p => Array.isArray(p) && p.length === 2 && p[0] && p[1])
+    .map(p => [String(p[0]).slice(0, 200), String(p[1]).slice(0, 200)]);
+
   const out = {
     warehouse: String(plan.warehouse || '').slice(0, 200),
     warehouseCoords: coordText(plan.warehouseCoords),
-    legs
+    legs,
+    need
   };
 
   // keep it small: drop the road paths if too big
@@ -362,6 +369,45 @@ export class SheetStore {
     if (path === '/api/calendar/overrides' && method === 'GET') {
 
       return json((await storage.get('place-overrides')) || {});
+
+    }
+
+
+    // ---------- TRIPS THE SAVED SHEETS NEED (read by the Apps Script) ----------
+    // [{ date, from, to }] for open sheets from yesterday on, in sheet order
+
+    if (path === '/api/calendar/requests' && method === 'GET') {
+
+      const since =
+        new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+
+      const out = [];
+      const seen = new Set();
+
+      for (const sheet of (await storage.list({ prefix: 'sheet:' })).values()) {
+
+        const d = sheet.date || {};
+
+        if (!d.year || sheet.status === 'closed') continue;
+
+        const date = `${d.year}-${String(d.month).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
+
+        if (date < since) continue;
+
+        for (const [from, to] of (sheet.plan?.need || [])) {
+
+          const k = date + '|' + from + '→' + to;
+
+          if (seen.has(k)) continue;
+
+          seen.add(k);
+          out.push({ date, from, to });
+
+        }
+
+      }
+
+      return json(out.slice(0, 1000));
 
     }
 
@@ -833,7 +879,7 @@ export default {
     if (url.pathname.startsWith('/api/')) {
 
       // Calendar push from Google needs the secret SYNC_KEY (or SYNC_TOKEN)
-      if (url.pathname === '/api/calendar/sync' || url.pathname === '/api/calendar/overrides') {
+      if (['/api/calendar/sync', '/api/calendar/overrides', '/api/calendar/requests'].includes(url.pathname)) {
 
         const key =
           request.headers.get('x-sync-key') || '';
