@@ -4,23 +4,17 @@ Digital delivery sheet fed by Google Calendar, served by a Cloudflare Worker.
 
 ## Access
 
-| | Admin (password) | Team (name only) |
-|---|---|---|
-| Date, route, PP / OS, sign out / in | edit | – |
-| Route preview (timeline + map + Google Maps link) | yes | yes (read only) |
-| Driving times, leave / back times | yes | – |
-| Delivery duration + red flags | edit | – |
-| Save / New / Delete sheet, Answers + CSV, Close day | yes | – |
-
-- Admin password = Cloudflare secret `ADMIN_PASSWORD`. Changing it logs every admin out.
-- Everybody types their name when the page opens. Team members only see the route preview of
-  the saved sheets; today's sheet opens by itself when there is only one.
-- Red flag 🚩: the delivery duration chosen by the admin differs from the planned time (length of
-  the calendar event). No tolerance. Shown on the row, in the preview, in the sheet list, in
-  Answers and in the CSV ("Red flag" = YES) – to check with the driver.
+- The site is closed: only the admin password (Cloudflare secret `ADMIN_PASSWORD`) opens it.
+  Every /api request without a valid admin token is refused by the Worker (401), so nothing can
+  be read even by calling the API directly. The page itself only shows the login.
+- Exceptions: the login and the Apps Script endpoints (protected by `SYNC_TOKEN`).
+- Max 5 wrong passwords per 15 minutes from the same address (then 429).
+- The password is remembered on each device (token in the browser); changing `ADMIN_PASSWORD`
+  logs every device out.
+- Red flag 🚩: the delivery duration chosen differs from the planned time (length of the calendar
+  event). No tolerance. Shown on the row, in the preview, in the sheet list, in Answers and in the
+  CSV ("Red flag" = YES).
 - "Close day" locks the sheet and opens the answers report.
-- No automatic refresh: the sheet is reloaded from the server whenever you change something
-  (duration, save, close / reopen), when you press Refresh, or when you reload the page.
 
 ## Route preview
 
@@ -30,6 +24,8 @@ Digital delivery sheet fed by Google Calendar, served by a Cloudflare Worker.
 - Schedule: every route leaves the warehouse at 09:30 (DEPART_TIME in public/index.html);
   calendar times are not used. For each stop: drive → arrive → delivery time → leave → next drive.
   Delivery time = the Delivery duration chosen, otherwise the planned time (calendar event length).
+- Same area: two deliveries in a row with the same area (e.g. two "D04") count 15 minutes between
+  them (SAME_AREA_MIN in public/index.html), without Google Maps.
 - Lunch: option in the PP / OS dropdown (once per sheet), adds 30 minutes at that point, no driving.
 - The Apps Script also sends the exact point ("lat,lng") of every delivery and of the warehouse:
   the "Open route in Maps" button and the map pins use it, so Maps never has to guess
@@ -57,7 +53,8 @@ Digital delivery sheet fed by Google Calendar, served by a Cloudflare Worker.
   the sheet. Ignored events: "1 van", "2 vans", no title, two-letter initials.
 - Columns: Delivery (event card) · PP / OS (all numbers found in the event) · Delivery duration
   (30 minutes → 6 hours, 15-minute steps).
-- Mobile: each delivery is a numbered block.
+- Mobile: each delivery is a numbered block; no Refresh / Print buttons; the delivery card has a
+  big "🧭 Open in Google Maps" button (directions, opens the Maps app).
 
 ## Calendar sync (manual)
 
