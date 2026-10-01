@@ -5,8 +5,9 @@
 // Sheets, duration answers, calendar and access log kept in one Durable Object
 //
 // Access:
-//   Admin  -> password (secret ADMIN_PASSWORD): date, route, events, durations, close the day
-//   Basic  -> name only: sees the route preview (read only)
+//   ONLY the admin password (secret ADMIN_PASSWORD) opens the site: every /api request
+//   without a valid admin token is refused. Exceptions: the login itself and the
+//   Apps Script endpoints (protected by the sync key).
 // =========================================
 
 
@@ -422,19 +423,47 @@ export class SheetStore {
 
       }
 
+      // max 5 wrong passwords per 15 minutes from the same address
+      const ip =
+        request.headers.get('cf-connecting-ip') || 'unknown';
+
+      const failKey =
+        'login-fail:' + ip;
+
+      const fails =
+        ((await storage.get(failKey)) || []).filter(t => t > Date.now() - 15 * 60000);
+
+      if (fails.length >= 5) {
+
+        return json({ error: 'Too many wrong passwords – try again in 15 minutes' }, 429);
+
+      }
+
       const body =
         await request.json().catch(() => ({}));
 
       if ((body.password || '') !== this.env.ADMIN_PASSWORD) {
 
+        fails.push(Date.now());
+        await storage.put(failKey, fails);
+
         return json({ error: 'Wrong password' }, 401);
 
       }
+
+      await storage.delete(failKey);
 
       return json({ token: await adminToken(this.env) });
 
     }
 
+
+    // the site is closed: everything below needs the admin password
+    if (!admin) {
+
+      return json({ error: 'Admin password required' }, 401);
+
+    }
 
     if (!name) {
 
