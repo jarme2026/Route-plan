@@ -34,6 +34,10 @@ Digital delivery sheet fed by Google Calendar, served by a Cloudflare Worker.
 - The Apps Script also sends the exact point ("lat,lng") of every delivery and of the warehouse:
   the "Open route in Maps" button and the map pins use it, so Maps never has to guess
   ("Dublin 16, Ireland"). Driving times and points cover the same 21 days as the sync.
+- Sheet order: the driving times follow the order of the rows on the sheet. "⟳ Sync calendar"
+  first saves the sheet (its trips go to the Worker), the Apps Script reads them
+  (GET /api/calendar/requests) and works them out, and the sheet is saved again afterwards so
+  the team sees the new times.
 - Set area (admin): when a delivery shows "Driving time not calculated yet" or "No place found",
   the admin clicks "📍 Set area" (or "📍 Change area" in the delivery card) and types the area /
   Eircode. It is saved on the website (key: date + event title); the Apps Script reads it on the
@@ -61,8 +65,9 @@ Digital delivery sheet fed by Google Calendar, served by a Cloudflare Worker.
   Script web app in a new tab (runs with the admin's Google login), which reads Google Calendar,
   works out the driving times and sends everything to the Worker. Back on the site, the calendar
   is reloaded once. Cloudflare: 2 requests per sync, nothing when nobody syncs.
-- The Apps Script sends its own web app address with each sync, so the button needs no setup
-  on the website – only a first ▶ Run of "atualizarPlanilha" after deploying the web app.
+- Sync link: the first time, "⟳ Sync calendar" asks for the web app link (Apps Script → Deploy →
+  Manage deployments → Web app URL, ends with /exec). Change it later with the ⚙ button.
+  (The Apps Script also sends its address with each sync; a link pasted on the site always wins.)
 - Web app deployment: Execute as Me · Who has access: Anyone within BoConcept Dublin.
   To update the script keep the same address: Manage deployments → ✏️ → New version.
 
@@ -101,7 +106,9 @@ wrangler.jsonc         Cloudflare config
 | GET | /api/calendar?date=YYYY-MM-DD | admin |
 | POST | /api/calendar/sync | Google Apps Script (header `x-sync-key` = `SYNC_TOKEN`) |
 | GET | /api/calendar/overrides | Google Apps Script (areas set by the admin) |
+| GET | /api/calendar/requests | Google Apps Script (trips the saved sheets need, in sheet order) |
 | PUT | /api/places | admin (set / clear the area of a delivery) |
+| PUT | /api/sync-url | admin (web app link for "Sync calendar") |
 
 ## Secrets (Cloudflare → Settings → Variables and Secrets)
 
