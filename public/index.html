@@ -1171,7 +1171,8 @@
 
     if (!area || /^\d+\s*vans?$/i.test(area)) return '';
 
-    const dublin = area.match(/^D\s?0?(\d{1,2})(W)?$/i);
+    // "D04", "D6W", also "D06 RPL" (extra words after the district code)
+    const dublin = area.match(/^D\s?0?(\d{1,2})(W)?(?:\s|$)/i);
     if (dublin) return 'Dublin ' + Number(dublin[1]) + (dublin[2] ? 'W' : '') + ', Ireland';
 
     return area + ', Ireland';
@@ -2090,14 +2091,16 @@
 
     if (typed === null) return;
 
-    const place = typed.trim();
+    let place = typed.trim();
 
     try {
 
-      await api('/api/places', {
+      const res = await api('/api/places', {
         method: 'PUT',
         body: JSON.stringify({ date: ev.date, title: ev.title, place })
       });
+
+      place = res.place || '';   // as saved: "D06" -> "Dublin 6, Ireland"
 
     } catch (err) {
 
