@@ -5,9 +5,11 @@
 // Sheets, duration answers, calendar and access log kept in one Durable Object
 //
 // Access:
-//   ONLY the admin password (secret ADMIN_PASSWORD) opens the site: every /api request
-//   without a valid admin token is refused. Exceptions: the login itself and the
-//   Apps Script endpoints (protected by the sync key).
+//   Closed site – two passwords:
+//     ADMIN_PASSWORD -> admin: everything
+//     TEAM_PASSWORD  -> team (optional secret): read only, route preview of saved sheets
+//   Every /api request without a valid token is refused. Exceptions: the login itself and
+//   the Apps Script endpoints (protected by the sync key).
 // =========================================
 
 
@@ -65,15 +67,37 @@ async function adminToken(env) {
 }
 
 
-async function isAdmin(request, env) {
+// Team token = SHA-256 of the team password (secret TEAM_PASSWORD, optional)
+async function teamToken(env) {
+
+  if (!env.TEAM_PASSWORD || env.TEAM_PASSWORD === env.ADMIN_PASSWORD) return '';
+
+  const data =
+    new TextEncoder().encode('route-plan-team:' + env.TEAM_PASSWORD);
+
+  const hash =
+    await crypto.subtle.digest('SHA-256', data);
+
+  return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, '0')).join('');
+
+}
+
+
+// 'admin' | 'team' | ''  (from the token the page sends)
+async function roleOf(request, env) {
 
   const sent =
     request.headers.get('x-admin-token') || '';
 
-  const token =
-    await adminToken(env);
+  if (!sent) return '';
 
-  return !!token && sent === token;
+  const admin = await adminToken(env);
+  if (admin && sent === admin) return 'admin';
+
+  const team = await teamToken(env);
+  if (team && sent === team) return 'team';
+
+  return '';
 
 }
 
@@ -84,6 +108,26 @@ function validSyncUrl(v) {
   const t = String(v || '').trim();
 
   return /^https:\/\/script\.google\.com\/[\w\-./]+\/(exec|dev)$/.test(t) ? t.slice(0, 300) : '';
+
+}
+
+
+// Area typed by the admin -> text Google Maps finds reliably
+//   "D06" / "D6" / "d06 rpl" -> "Dublin 6, Ireland"     "D16X957K" -> "D16 X957K, Ireland"
+//   "Dundrum" -> "Dundrum, Ireland"                       (texts with "Ireland" stay as they are)
+function normalizeArea(v) {
+
+  const t = String(v || '').trim().replace(/\s+/g, ' ').slice(0, 200);
+
+  if (!t) return '';
+
+  const eir = t.match(/^([AC-FHKNPRTV-Y]\d{2}|D6W)\s?([0-9AC-FHKNPRTV-Y]{4})$/i);
+  if (eir) return (eir[1] + ' ' + eir[2]).toUpperCase() + ', Ireland';
+
+  const dub = t.match(/^D\s?0?(\d{1,2})(W)?(?:\s|$)/i);
+  if (dub) return 'Dublin ' + Number(dub[1]) + (dub[2] ? 'W' : '') + ', Ireland';
+
+  return /ireland/i.test(t) ? t : t + ', Ireland';
 
 }
 
@@ -232,8 +276,11 @@ export class SheetStore {
     const name =
       userName(request);
 
+    const role =
+      await roleOf(request, this.env);
+
     const admin =
-      await isAdmin(request, this.env);
+      role === 'admin';
 
     const storage =
       this.ctx.storage;
@@ -369,7 +416,9 @@ export class SheetStore {
 
     if (path === '/api/calendar/overrides' && method === 'GET') {
 
-      return json((await storage.get('place-overrides')) || {});
+      const raw = (await storage.get('place-overrides')) || {};
+
+      return json(Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, normalizeArea(v)])));
 
     }
 
@@ -442,7 +491,20 @@ export class SheetStore {
       const body =
         await request.json().catch(() => ({}));
 
-      if ((body.password || '') !== this.env.ADMIN_PASSWORD) {
+      const typed = body.password || '';
+
+      // admin password first, then the team password (TEAM_PASSWORD, optional)
+      let token = '', who = '';
+
+      if (typed === this.env.ADMIN_PASSWORD) {
+        token = await adminToken(this.env);
+        who = 'admin';
+      } else if (this.env.TEAM_PASSWORD && typed === this.env.TEAM_PASSWORD) {
+        token = await teamToken(this.env);
+        who = 'team';
+      }
+
+      if (!token) {
 
         fails.push(Date.now());
         await storage.put(failKey, fails);
@@ -453,15 +515,16 @@ export class SheetStore {
 
       await storage.delete(failKey);
 
-      return json({ token: await adminToken(this.env) });
+      return json({ token, role: who });
 
     }
 
 
-    // the site is closed: everything below needs the admin password
-    if (!admin) {
+    // the site is closed: everything below needs the admin or the team password
+    // (team = read only: list + open sheets; every change is checked as admin below)
+    if (!role) {
 
-      return json({ error: 'Admin password required' }, 401);
+      return json({ error: 'Password required' }, 401);
 
     }
 
@@ -477,7 +540,7 @@ export class SheetStore {
       const meta =
         admin ? ((await storage.get('calendar-meta')) || {}) : {};
 
-      return json({ name, admin, syncUrl: admin ? (meta.syncUrl || '') : '' });
+      return json({ name, admin, role, syncUrl: admin ? (meta.syncUrl || '') : '' });
 
     }
 
@@ -551,7 +614,7 @@ export class SheetStore {
 
       const date = String(body.date || '').slice(0, 10);
       const title = String(body.title || '').trim().slice(0, 300);
-      const place = String(body.place || '').trim().slice(0, 200);
+      const place = normalizeArea(body.place);
 
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !title) {
 
@@ -609,7 +672,7 @@ export class SheetStore {
         ((await storage.get('cal:' + date)) || [])
           .sort((a, b) => (a.start || '').localeCompare(b.start || ''))
           .map(e => {
-            const area = overrides[date + '|' + String(e.title || '').trim()];
+            const area = normalizeArea(overrides[date + '|' + String(e.title || '').trim()]);
             if (!area) return e;
             // new area not synced yet: its old map point is no longer valid
             return e.place === area
